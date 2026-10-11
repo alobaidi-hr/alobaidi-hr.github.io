@@ -14,8 +14,9 @@ const TYPES = { annual: 1, mid: 1, quarter: 1, probation: 1 };
 const STATUSES = ['new', 'printed', 'sent', 'signed'];
 
 const store = () => getStore({ name: 'lo-hr', consistency: 'strong' });
-const ok = (o = {}) => Response.json({ ok: true, ...o });
-const fail = (error, message) => Response.json({ ok: false, error, message });
+const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST, GET, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' };
+const ok = (o = {}) => Response.json({ ok: true, ...o }, { headers: CORS });
+const fail = (error, message) => Response.json({ ok: false, error, message }, { headers: CORS });
 class ApiError extends Error { constructor(code, msg) { super(msg); this.code = code; } }
 const err = (code, msg) => { throw new ApiError(code, msg); };
 const now = () => new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Baghdad' });
@@ -250,6 +251,7 @@ const R = {
 };
 
 export default async (req) => {
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
   if (req.method === 'GET') return ok({ service: 'L-O HR API', version: '1.0' });
   let body; try { body = JSON.parse(await req.text()); } catch { return fail('bad_request', 'طلب غير صالح'); }
   const fn = R[body.action]; if (!fn) return fail('bad_action', 'إجراء غير معروف');
