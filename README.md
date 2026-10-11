@@ -1,2 +1,7 @@
-# alobaidi-hr.github.io
-Al-Laith Al-Obaidi — HR Job Descriptions, KPIs &amp; Performance
+# L-O HR — Job Descriptions, KPIs & Performance
+
+نظام الأوصاف الوظيفية ومؤشرات الأداء وتقييم الأداء — شركة الليث العبيدي
+إعداد مدير الموارد البشرية **أوس فراس الشلال** · Prepared by HR Manager Aws Firas Al-Shalal
+
+هذه الصفحة واجهة الدخول فقط. النظام وبيانات الموظفين والتقييمات محفوظة في خادم Google Apps Script خاص بالشركة،
+ولا يصل إليها إلا المستخدمون المسجّلون، كلٌّ حسب قسمه.
