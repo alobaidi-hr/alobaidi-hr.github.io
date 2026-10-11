@@ -1,0 +1,10 @@
+{
+  "name": "lo-hr-system",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Al-Laith Al-Obaidi — HR Job Descriptions, KPIs & Performance. Prepared by HR Manager Aws Firas Al-Shalal",
+  "type": "module",
+  "dependencies": {
+    "@netlify/blobs": "^8.1.0"
+  }
+}
