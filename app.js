@@ -268,7 +268,7 @@ function route() {
   if (adminOnly.indexOf(r) >= 0 && !isAdmin()) r = 'home';
   $$('.nav').forEach(function (a) { a.classList.toggle('on', a.dataset.r === r); });
   document.body.classList.remove('navopen'); closeModal();
-  var v = $('#view'); v.scrollTop = 0; window.scrollTo(0, 0);
+  var v = $('#view'); v.onclick = null; v.scrollTop = 0; window.scrollTo(0, 0);
   var fn = VIEWS[r] || VIEWS.home;
   fn(v, arg, q);
   logView(r, arg || q.emp || '');
@@ -286,6 +286,23 @@ function syncMine(r) {
     var cur = ((location.hash || '#/home').slice(2).split('?')[0].split('/')[0]) || 'home';
     if (cur === r && !$('#modal') && !(r === 'eval' && $('#elist .ebtn[aria-pressed="true"]'))) route();
   }).catch(function () { syncing = false; });
+}
+function findEval(id) { return (S.inbox || []).concat(S.evals).filter(function (x) { return x.id === id; }); }
+function evalActs(e, redraw) {
+  var b = e.target.closest('[data-del],[data-ap],[data-ar]'); if (!b) return false;
+  e.stopPropagation();
+  var set = function (k, v) { findEval(b.dataset.ap || b.dataset.ar).forEach(function (x) { x[k] = v; }); };
+  if (b.dataset.del) {
+    if (!b.dataset.ok) { b.dataset.ok = '1'; b.innerHTML = 'تأكيد الحذف؟'; setTimeout(function () { if (b.isConnected && b.dataset.ok) { delete b.dataset.ok; b.innerHTML = ic('trash') + 'حذف'; } }, 4000); return true; }
+    b.disabled = true; delEval(b.dataset.del).then(redraw).catch(function (er) { b.disabled = false; toast(er.message); });
+  } else if (b.dataset.ap) {
+    if (!b.dataset.ok) { b.dataset.ok = '1'; b.textContent = 'تأكيد الاعتماد؟'; setTimeout(function () { if (b.isConnected && b.dataset.ok) { delete b.dataset.ok; b.textContent = 'اعتماد'; } }, 4000); return true; }
+    b.disabled = true; api('markEval', { id: b.dataset.ap, status: 'signed' }).then(function () { set('status', 'signed'); toast('تم اعتماد التقييم وقفله'); redraw(); }).catch(function (er) { b.disabled = false; toast(er.message); });
+  } else if (b.dataset.ar) {
+    var arch = !findEval(b.dataset.ar).some(function (x) { return x.archived; });
+    b.disabled = true; api('markEval', { id: b.dataset.ar, archived: arch }).then(function () { set('archived', arch); toast(arch ? 'تمت الأرشفة — تجدها في «المؤرشفة»' : 'أُعيد التقييم من الأرشيف'); redraw(); }).catch(function (er) { b.disabled = false; toast(er.message); });
+  }
+  return true;
 }
 function dropMine(id) { S.evals = S.evals.filter(function (x) { return x.id !== id; }); var mc = $('#minec'); if (mc) mc.textContent = S.evals.length; }
 function delEval(id) {
@@ -591,22 +608,33 @@ VIEWS.eval = function (v, editId, q) {
 };
 
 /* ----- my evaluations */
-function evalTable(list, admin) {
+function evalTable(list, admin, acts) {
+  acts = acts || admin;
   if (!list.length) return '<div class="empty">لا توجد تقييمات بعد</div>';
-  return '<div class="tw"><table class="t minw"><thead><tr><th>التاريخ</th><th>الموظف</th><th>الوظيفة</th>' + (admin ? '<th>المقيِّم</th>' : '') + '<th>النوع / الفترة</th><th>النهائية</th><th>التقدير</th><th>الحالة</th>' + (admin ? '<th></th>' : '') + '</tr></thead><tbody>' +
+  return '<div class="tw"><table class="t minw"><thead><tr><th>التاريخ</th><th>الموظف</th><th>الوظيفة</th>' + (admin ? '<th>المقيِّم</th>' : '') + '<th>النوع / الفترة</th><th>النهائية</th><th>التقدير</th><th>الحالة</th>' + (acts ? '<th></th>' : '') + '</tr></thead><tbody>' +
     list.map(function (r) {
       var j = JOB[r.emp.code] || {};
       return '<tr class="click' + (admin && !r.read ? ' unread' : '') + '" data-ev="' + esc(r.id) + '"><td class="num">' + esc(r.updated.slice(0, 10)) + '</td><td>' + esc(r.emp.name) + '<div class="num muted" style="font-size:11px">' + esc(r.emp.id) + '</div></td><td>' + esc(j.ar || r.emp.code) + '<div class="muted" style="font-size:11px">' + esc(deptName(r.emp.dept)) + '</div></td>' +
         (admin ? '<td>' + esc(r.ev.name) + '<div class="muted" style="font-size:11px">' + esc(r.ev.title) + '</div></td>' : '') +
-        '<td>' + TYPE[r.type][1] + '<div class="num muted" style="font-size:11px">' + esc(r.period) + '</div></td><td class="num"><b>' + r.F.toFixed(1) + '</b></td><td><span class="pill r' + r.r + '">' + RATES[r.r][0] + '</span></td><td><span class="tag">' + STAT[r.status][1] + '</span></td>' + (admin ? '<td class="w"><button class="btn danger sm" data-del="' + esc(r.id) + '" title="نقل إلى سلة المحذوفات">' + ic('trash') + 'حذف</button></td>' : '') + '</tr>';
+        '<td>' + TYPE[r.type][1] + '<div class="num muted" style="font-size:11px">' + esc(r.period) + '</div></td><td class="num"><b>' + r.F.toFixed(1) + '</b></td><td><span class="pill r' + r.r + '">' + RATES[r.r][0] + '</span></td><td><span class="tag">' + STAT[r.status][1] + '</span>' + (r.archived ? ' <span class="tag">مؤرشف</span>' : '') + '</td>' + (acts ? '<td class="w"><div class="actions" style="flex-wrap:nowrap">' + (r.status === 'signed' ? '<span class="pill r3">معتمد</span>' : '<button class="btn pri sm" data-ap="' + esc(r.id) + '" title="اعتماد التقييم (موقّع ومحفوظ)">اعتماد</button>') + '<button class="btn sec sm" data-ar="' + esc(r.id) + '">' + (r.archived ? 'إلغاء الأرشفة' : 'أرشفة') + '</button><button class="btn danger sm" data-del="' + esc(r.id) + '" title="نقل إلى سلة المحذوفات">' + ic('trash') + 'حذف</button></div></td>' : '') + '</tr>';
     }).join('') + '</tbody></table></div>';
 }
 function bindEvalTable(v, list, admin) {
   v.addEventListener('click', function (e) { var r = e.target.closest('[data-ev]'); if (!r) return; var rec = list.filter(function (x) { return x.id === r.dataset.ev; })[0]; if (rec) openEval(rec, admin); });
 }
+var MINE_ARCH = false;
 VIEWS.mine = function (v) {
-  v.innerHTML = head('تقييماتي', 'التقييمات التي أرسلتها — يمكنك فتح أي تقييم وتعديله ما لم يُوقَّع') + '<div id="ml">' + evalTable(S.evals, false) + '</div>';
-  bindEvalTable(v, S.evals, false);
+  var adm = isAdmin();
+  var draw = function () {
+    var list = S.evals.filter(function (x) { return MINE_ARCH ? x.archived : !x.archived; }), na = S.evals.filter(function (x) { return x.archived; }).length;
+    v.innerHTML = head('تقييماتي', 'التقييمات التي أرسلتها — يمكنك فتح أي تقييم وتعديله ما لم يُوقَّع', '', '<button class="btn sec" id="mar">' + (MINE_ARCH ? 'عرض الحالية' : 'المؤرشفة (' + na + ')') + '</button>') + '<div id="ml">' + evalTable(list, false, adm) + '</div>';
+    $('#mar').onclick = function () { MINE_ARCH = !MINE_ARCH; draw(); };
+  };
+  v.onclick = function (e) {
+    if (adm && evalActs(e, draw)) return;
+    var r = e.target.closest('[data-ev]'); if (!r) return; var rec = S.evals.filter(function (x) { return x.id === r.dataset.ev; })[0]; if (rec) openEval(rec, adm);
+  };
+  draw();
 };
 function openEval(rec, admin) {
   var canEdit = rec.status !== 'signed' && (rec.ev.email === S.user.email || admin) && EMP[rec.emp.id];
@@ -649,7 +677,7 @@ VIEWS.inbox = function (v) {
 function filteredInbox() {
   var q = IF.q.trim().toLowerCase();
   return (S.inbox || []).filter(function (r) {
-    return (!IF.dept || String(r.emp.dept) === IF.dept) && (IF.rate === '' || String(r.r) === IF.rate) && (!IF.stat || r.status === IF.stat) && (!IF.per || r.period === IF.per) &&
+    return (!IF.dept || String(r.emp.dept) === IF.dept) && (IF.rate === '' || String(r.r) === IF.rate) && (IF.stat === 'arch' ? r.archived : (!r.archived && (!IF.stat || r.status === IF.stat))) && (!IF.per || r.period === IF.per) &&
       (!q || (r.emp.name + ' ' + r.emp.id + ' ' + r.emp.code + ' ' + r.ev.name + ' ' + r.ev.email).toLowerCase().indexOf(q) >= 0);
   });
 }
@@ -671,19 +699,14 @@ function drawInbox() {
     '<label class="f">بحث <span class="en">Search</span><input class="inp" id="iq" type="search" value="' + esc(IF.q) + '"></label>' +
     '<label class="f">القسم<select class="inp" id="id">' + opt('', IF.dept, 'الكل') + S.data.depts.map(function (d) { return opt(d.no, IF.dept, esc(d.ar)); }).join('') + '</select></label>' +
     '<label class="f">التقدير<select class="inp" id="ir">' + opt('', IF.rate, 'الكل') + RATES.map(function (r, i) { return opt(i, IF.rate, r[0]); }).join('') + '</select></label>' +
-    '<label class="f">الحالة<select class="inp" id="is">' + opt('', IF.stat, 'الكل') + STATUS.map(function (s) { return opt(s[0], IF.stat, s[1]); }).join('') + '</select></label>' +
+    '<label class="f">الحالة<select class="inp" id="is">' + opt('', IF.stat, 'الكل') + STATUS.map(function (s) { return opt(s[0], IF.stat, s[1]); }).join('') + opt('arch', IF.stat, 'المؤرشفة') + '</select></label>' +
     '<label class="f">الفترة<select class="inp" id="ip">' + opt('', IF.per, 'الكل') + pers.map(function (p) { return opt(p, IF.per, esc(p)); }).join('') + '</select></label></div></div>' +
     '<div class="muted" style="font-size:12px;margin-bottom:6px">' + list.length + ' من ' + all.length + '</div><div id="itb">' + (all.length ? evalTable(list, true) : '<div class="empty">لم تصل تقييمات بعد. أضف رؤساء الأقسام من صفحة «المستخدمون والأقسام» وأرسل لهم رمز التفعيل.</div>') + '</div>';
   [['iq', 'q', 'input'], ['id', 'dept', 'change'], ['ir', 'rate', 'change'], ['is', 'stat', 'change'], ['ip', 'per', 'change']].forEach(function (x) {
     $('#' + x[0]).addEventListener(x[2], function () { IF[x[1]] = this.value; var l = filteredInbox(); $('#itb').innerHTML = evalTable(l, true); });
   });
   $('#itb').onclick = function (e) {
-    var d = e.target.closest('[data-del]');
-    if (d) {
-      e.stopPropagation();
-      if (!d.dataset.ok) { d.dataset.ok = '1'; d.innerHTML = 'تأكيد الحذف؟'; setTimeout(function () { if (d.isConnected && d.dataset.ok) { delete d.dataset.ok; d.innerHTML = ic('trash') + 'حذف'; } }, 4000); return; }
-      d.disabled = true; delEval(d.dataset.del).then(drawInbox).catch(function (er) { d.disabled = false; toast(er.message); }); return;
-    }
+    if (evalActs(e, drawInbox)) return;
     var r = e.target.closest('[data-ev]'); if (!r) return; var rec = (S.inbox || []).filter(function (x) { return x.id === r.dataset.ev; })[0]; if (rec) openEval(rec, true); };
 }
 function trashModal(reload) {

@@ -203,10 +203,11 @@ const R = {
   async myEvals({ token }) { const { email } = await auth(token); return { evals: Object.values(await evals()).filter((x) => x.ev.email === email) }; },
 
   async listEvals({ token }) { await admin(token); return { evals: Object.values(await evals()).sort((a, b) => (a.updated < b.updated ? 1 : -1)) }; },
-  async markEval({ token, id, status, read }) {
+  async markEval({ token, id, status, read, archived }) {
     await admin(token); const all = await evals(); if (!all[id]) err('not_found', 'التقييم غير موجود');
     if (status !== undefined) { if (!STATUSES.includes(status)) err('invalid', 'حالة غير صالحة'); all[id].status = status; }
     if (read !== undefined) all[id].read = !!read;
+    if (archived !== undefined) all[id].archived = !!archived;
     await setJSON('evals', all); return {};
   },
   async deleteEval({ token, id }) {
