@@ -272,6 +272,28 @@ function route() {
   var fn = VIEWS[r] || VIEWS.home;
   fn(v, arg, q);
   logView(r, arg || q.emp || '');
+  if (['home', 'eval', 'mine', 'emp'].indexOf(fn === VIEWS.home ? 'home' : r) >= 0) syncMine(r);
+}
+/* keep "evaluated" marks in step with HR deletions / restores */
+var syncing = false;
+function syncMine(r) {
+  if (syncing) return; syncing = true;
+  api('myEvals').then(function (res) {
+    syncing = false;
+    var key = function (l) { return l.map(function (x) { return x.id + '|' + x.updated + '|' + x.status; }).sort().join(','); };
+    if (key(res.evals || []) === key(S.evals)) return;
+    S.evals = res.evals || []; var mc = $('#minec'); if (mc) mc.textContent = S.evals.length;
+    var cur = ((location.hash || '#/home').slice(2).split('?')[0].split('/')[0]) || 'home';
+    if (cur === r && !$('#modal') && !(r === 'eval' && $('#elist .ebtn[aria-pressed="true"]'))) route();
+  }).catch(function () { syncing = false; });
+}
+function dropMine(id) { S.evals = S.evals.filter(function (x) { return x.id !== id; }); var mc = $('#minec'); if (mc) mc.textContent = S.evals.length; }
+function delEval(id) {
+  return api('deleteEval', { id: id }).then(function () {
+    S.inbox = (S.inbox || []).filter(function (x) { return x.id !== id; }); dropMine(id);
+    S.unread = (S.inbox || []).filter(function (x) { return !x.read; }).length; updUnread();
+    toast('نُقل التقييم إلى سلة المحذوفات — يمكنك استرجاعه');
+  });
 }
 window.addEventListener('hashchange', route);
 function head(title, sub, crumbs, actions) {
@@ -571,12 +593,12 @@ VIEWS.eval = function (v, editId, q) {
 /* ----- my evaluations */
 function evalTable(list, admin) {
   if (!list.length) return '<div class="empty">لا توجد تقييمات بعد</div>';
-  return '<div class="tw"><table class="t minw"><thead><tr><th>التاريخ</th><th>الموظف</th><th>الوظيفة</th>' + (admin ? '<th>المقيِّم</th>' : '') + '<th>النوع / الفترة</th><th>النهائية</th><th>التقدير</th><th>الحالة</th></tr></thead><tbody>' +
+  return '<div class="tw"><table class="t minw"><thead><tr><th>التاريخ</th><th>الموظف</th><th>الوظيفة</th>' + (admin ? '<th>المقيِّم</th>' : '') + '<th>النوع / الفترة</th><th>النهائية</th><th>التقدير</th><th>الحالة</th>' + (admin ? '<th></th>' : '') + '</tr></thead><tbody>' +
     list.map(function (r) {
       var j = JOB[r.emp.code] || {};
       return '<tr class="click' + (admin && !r.read ? ' unread' : '') + '" data-ev="' + esc(r.id) + '"><td class="num">' + esc(r.updated.slice(0, 10)) + '</td><td>' + esc(r.emp.name) + '<div class="num muted" style="font-size:11px">' + esc(r.emp.id) + '</div></td><td>' + esc(j.ar || r.emp.code) + '<div class="muted" style="font-size:11px">' + esc(deptName(r.emp.dept)) + '</div></td>' +
         (admin ? '<td>' + esc(r.ev.name) + '<div class="muted" style="font-size:11px">' + esc(r.ev.title) + '</div></td>' : '') +
-        '<td>' + TYPE[r.type][1] + '<div class="num muted" style="font-size:11px">' + esc(r.period) + '</div></td><td class="num"><b>' + r.F.toFixed(1) + '</b></td><td><span class="pill r' + r.r + '">' + RATES[r.r][0] + '</span></td><td><span class="tag">' + STAT[r.status][1] + '</span></td></tr>';
+        '<td>' + TYPE[r.type][1] + '<div class="num muted" style="font-size:11px">' + esc(r.period) + '</div></td><td class="num"><b>' + r.F.toFixed(1) + '</b></td><td><span class="pill r' + r.r + '">' + RATES[r.r][0] + '</span></td><td><span class="tag">' + STAT[r.status][1] + '</span></td>' + (admin ? '<td class="w"><button class="btn danger sm" data-del="' + esc(r.id) + '" title="نقل إلى سلة المحذوفات">' + ic('trash') + 'حذف</button></td>' : '') + '</tr>';
     }).join('') + '</tbody></table></div>';
 }
 function bindEvalTable(v, list, admin) {
@@ -604,7 +626,7 @@ function openEval(rec, admin) {
     $('#mdel').onclick = function (e) {
       if (e.target.id === 'md') { $('#mdel').innerHTML = '<span class="confirm">نقل إلى سلة المحذوفات؟ <button class="btn danger sm" id="my">نعم، احذف</button><button class="btn sec sm" id="mn">إلغاء</button></span>'; }
       if (e.target.id === 'mn') $('#mdel').innerHTML = '<button class="btn danger sm" id="md">حذف</button>';
-      if (e.target.id === 'my') api('deleteEval', { id: rec.id }).then(function () { S.inbox = (S.inbox || []).filter(function (x) { return x.id !== rec.id; }); closeModal(); toast('نُقل التقييم إلى سلة المحذوفات — يمكنك استرجاعه'); route(); }).catch(function (er) { $('#mm').className = 'msg err'; $('#mm').textContent = er.message; });
+      if (e.target.id === 'my') delEval(rec.id).then(function () { closeModal(); route(); }).catch(function (er) { $('#mm').className = 'msg err'; $('#mm').textContent = er.message; });
     };
   }
 }
@@ -655,7 +677,14 @@ function drawInbox() {
   [['iq', 'q', 'input'], ['id', 'dept', 'change'], ['ir', 'rate', 'change'], ['is', 'stat', 'change'], ['ip', 'per', 'change']].forEach(function (x) {
     $('#' + x[0]).addEventListener(x[2], function () { IF[x[1]] = this.value; var l = filteredInbox(); $('#itb').innerHTML = evalTable(l, true); });
   });
-  $('#itb').onclick = function (e) { var r = e.target.closest('[data-ev]'); if (!r) return; var rec = (S.inbox || []).filter(function (x) { return x.id === r.dataset.ev; })[0]; if (rec) openEval(rec, true); };
+  $('#itb').onclick = function (e) {
+    var d = e.target.closest('[data-del]');
+    if (d) {
+      e.stopPropagation();
+      if (!d.dataset.ok) { d.dataset.ok = '1'; d.innerHTML = 'تأكيد الحذف؟'; setTimeout(function () { if (d.isConnected && d.dataset.ok) { delete d.dataset.ok; d.innerHTML = ic('trash') + 'حذف'; } }, 4000); return; }
+      d.disabled = true; delEval(d.dataset.del).then(drawInbox).catch(function (er) { d.disabled = false; toast(er.message); }); return;
+    }
+    var r = e.target.closest('[data-ev]'); if (!r) return; var rec = (S.inbox || []).filter(function (x) { return x.id === r.dataset.ev; })[0]; if (rec) openEval(rec, true); };
 }
 function trashModal(reload) {
   var m = modal('<div class="mbox"><div class="card"><div class="hd"><h2>سلة المحذوفات</h2><span class="muted" style="font-size:12px">التقييمات المحذوفة — استرجعها أو احذفها نهائياً</span></div><div class="bd" id="tbx"><div class="loading" style="min-height:20vh"><div class="spin"></div></div></div><div class="bd" style="display:flex;gap:8px;justify-content:space-between;padding-top:0"><span id="tall"></span><button class="btn sec" data-close>إغلاق</button></div></div></div>');
@@ -672,7 +701,7 @@ function trashModal(reload) {
   var load = function () { return api('listTrash').then(function (r) { list = r.evals; draw(); }).catch(function (e) { var b = $('#tbx'); if (b) b.innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; }); };
   m.addEventListener('click', function (e) {
     var t = e.target.closest('button'); if (!t) return;
-    if (t.dataset.rs) api('restoreEval', { id: t.dataset.rs }).then(function () { toast('تم استرجاع التقييم إلى صندوق النتائج'); load(); if (reload) reload(); }).catch(function (er) { toast(er.message); });
+    if (t.dataset.rs) api('restoreEval', { id: t.dataset.rs }).then(function (res) { if (res.eval && res.eval.ev && res.eval.ev.email === S.user.email) { dropMine(res.eval.id); S.evals.unshift(res.eval); var mc = $('#minec'); if (mc) mc.textContent = S.evals.length; } toast('تم استرجاع التقييم إلى صندوق النتائج'); load(); if (reload) reload(); }).catch(function (er) { toast(er.message); });
     if (t.dataset.pg) { if (t.dataset.ok) api('purgeEval', { id: t.dataset.pg }).then(function () { toast('حُذف نهائياً'); load(); }).catch(function (er) { toast(er.message); }); else { t.dataset.ok = '1'; t.textContent = 'تأكيد الحذف النهائي'; } }
     if (t.id === 'tpa') { if (t.dataset.ok) api('purgeEval', { id: '*' }).then(function () { toast('تم إفراغ السلة'); load(); }).catch(function (er) { toast(er.message); }); else { t.dataset.ok = '1'; t.textContent = 'تأكيد: حذف الكل نهائياً'; } }
   });
