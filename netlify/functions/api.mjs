@@ -26,13 +26,21 @@ async function getJSON(key, def) { const v = await store().get(key, { type: 'jso
 async function setJSON(key, val) { await store().setJSON(key, val); }
 
 /* ---------- data: public part in the repository, employee data encrypted until HR unlocks it ---------- */
-let SEED = null, JOBS = {};
+let SEED = null, JOBS = {}, BASE = null;
+/* HR edits (jobs, KPIs, employees, departments, criteria) are stored apart from the original data and applied on top */
+function applyEdits(B, ed) {
+  const merge = (list, key, map) => {
+    map = map || {}; const out = list.map((x) => (Object.prototype.hasOwnProperty.call(map, key(x)) ? map[key(x)] : x)).filter(Boolean);
+    const have = new Set(list.map(key)); for (const [k, v] of Object.entries(map)) if (v && !have.has(k)) out.push(v);
+    return out;
+  };
+  return { ...B, jobs: merge(B.jobs, (j) => j.code, ed.jobs), emps: merge(B.emps, (e) => e[0], ed.emps),
+    depts: merge(B.depts, (d) => String(d.no), ed.depts).sort((a, b) => a.no - b.no), crit: ed.crit || B.crit, profiles: ed.profiles || {}, orgs: ed.orgs || { companies: [], brands: [] } };
+}
 async function loadData(required = true) {
-  if (!SEED) {
-    const d = await getJSON('data', null);
-    if (d) { SEED = { ...PUB, ...d }; JOBS = Object.fromEntries(SEED.jobs.map((j) => [j.code, j])); }
-  }
-  if (!SEED && required) err('locked_data', 'بيانات النظام بانتظار التفعيل من مدير الموارد البشرية.');
+  if (!BASE) { const d = await getJSON('data', null); if (d) BASE = { ...PUB, ...d }; }
+  if (!BASE) { SEED = null; if (required) err('locked_data', 'بيانات النظام بانتظار التفعيل من مدير الموارد البشرية.'); return null; }
+  SEED = applyEdits(BASE, await getJSON('edits', {})); JOBS = Object.fromEntries(SEED.jobs.map((j) => [j.code, j]));
   return SEED;
 }
 function decrypt(pass) {
@@ -41,6 +49,24 @@ function decrypt(pass) {
   const dc = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ENC.iv, 'base64')); dc.setAuthTag(tag);
   return JSON.parse(Buffer.concat([dc.update(body), dc.final()]).toString('utf8'));
 }
+function cleanJob(j) {
+  const s = (v, n = 2000) => String(v == null ? '' : v).trim().slice(0, n), b = j.b || {};
+  const pair = (p, n) => [s(p && p[0], n), s(p && p[1], n)];
+  const list = (l) => (Array.isArray(l) ? l : []).map((p) => pair(p, 600)).filter((p) => p[0] || p[1]).slice(0, 40);
+  const kpis = (Array.isArray(b.kpis) ? b.kpis : []).map((k) => ({ en: s(k.en, 300), ar: s(k.ar, 300), t_en: s(k.t_en, 300), t_ar: s(k.t_ar, 300), m_en: s(k.m_en, 300), m_ar: s(k.m_ar, 300), f_en: s(k.f_en, 60), f_ar: s(k.f_ar, 60), w: Math.round(Number(k.w) * 100) / 100 || 0 })).filter((k) => k.en || k.ar);
+  const q = b.qual || {}, o = b.ov || {};
+  return { code: s(j.code, 20).toUpperCase(), dept: Number(j.dept), en: s(j.en, 150), ar: s(j.ar, 150),
+    b: { purpose: pair(b.purpose, 1500), duties: list(b.duties), kpis,
+      qual: { Education: pair(q.Education, 600), Experience: pair(q.Experience, 600), Languages: pair(q.Languages, 600) },
+      tech: list(b.tech), beh: list(b.beh),
+      ov: { 'Reports To': pair(o['Reports To'], 200), Grade: [s((o.Grade || [])[0], 200)], Branches: [s((o.Branches || [])[0], 200)], Headcount: [s((o.Headcount || [])[0], 20)], 'Employment Type': [s((o['Employment Type'] || [])[0], 200)] } } };
+}
+function checkKpis(k) {
+  if (k.length < 1 || k.length > 15) err('invalid', 'عدد مؤشرات الأداء بين 1 و 15');
+  if (k.some((x) => x.w <= 0)) err('invalid', 'كل مؤشر يحتاج وزناً أكبر من صفر');
+  const sum = Math.round(k.reduce((t, x) => t + x.w, 0) * 100) / 100; if (Math.abs(sum - 100) > 0.5) err('invalid', 'مجموع أوزان المؤشرات يجب أن يساوي 100% (الحالي ' + sum + '%)');
+}
+const PROFILE_KEYS = ['phone', 'email', 'hire', 'birth', 'company', 'brand', 'grade', 'contract', 'nat', 'address', 'notes'];
 const empDept = (e) => (JOBS[e[2]] ? JOBS[e[2]].dept : 0);
 
 async function settings() { return { ...PUB.settings, ...(await getJSON('settings', {})) }; }
@@ -54,7 +80,15 @@ async function users() {
 const hash = (pw, salt) => crypto.pbkdf2Sync(String(pw), salt, 120000, 32, 'sha256').toString('base64');
 const randCode = () => crypto.randomBytes(3).toString('hex').toUpperCase();
 const deptList = (u) => (u.role === 'admin' ? 'ALL' : (u.depts || []).map(Number));
-const publicUser = (email, u) => ({ email, name: u.name, title: u.title || '', role: u.role === 'admin' ? 'admin' : 'manager', depts: deptList(u), allJD: u.role === 'admin' || !!u.allJD });
+const permsOf = (u) => (u.role === 'admin' ? { jd: true, emp: true } : { jd: !!(u.perms && u.perms.jd), emp: !!(u.perms && u.perms.emp) });
+const publicUser = (email, u) => ({ email, name: u.name, title: u.title || '', role: u.role === 'admin' ? 'admin' : 'manager', depts: deptList(u), allJD: u.role === 'admin' || !!u.allJD, perms: permsOf(u) });
+/* admin, or a manager given the edit permission — limited to his own departments */
+async function editor(token, kind, depts) {
+  const a = await auth(token), pu = publicUser(a.email, a.u); if (pu.role === 'admin') return a;
+  if (!pu.perms[kind]) err('forbidden', 'ليست لديك صلاحية التعديل');
+  for (const d of depts) if (d != null && !pu.depts.includes(Number(d))) err('forbidden', 'هذا خارج أقسامك');
+  return a;
+}
 
 async function logVisit(email, name, action, ref) {
   const v = await getJSON('visits', []);
@@ -87,7 +121,7 @@ async function admin(token) { const a = await auth(token); if (a.u.role !== 'adm
 function calc(kpis, a, b, type) {
   let sw = 0, ss = 0, anyLow = false, allHi = true;
   kpis.forEach((k, i) => { const v = a[i]; if (v !== null && v !== undefined) { sw += k.w; ss += k.w * v; if (v < 5) anyLow = true; if (v < 6) allHi = false; } });
-  let bw = 0, bs = 0; PUB.crit.forEach((c, i) => { bw += c[2]; bs += c[2] * b[i]; });
+  let bw = 0, bs = 0; SEED.crit.forEach((c, i) => { bw += c[2]; bs += c[2] * b[i]; });
   const r1 = (x) => Math.round(x * 10) / 10;
   const A = ss / sw * 10, B = bs / bw * 10, F = r1(0.6 * A + 0.4 * B), rc = [];
   if (F >= 85 && allHi) rc.push('PROMO');
@@ -155,9 +189,10 @@ const R = {
       user: pu, settings: publicSettings(st), depts: SEED.depts,
       jobs: SEED.jobs.filter((j) => pu.allJD || inDept(j.dept)),
       emps: SEED.emps.filter((e) => inDept(empDept(e))),
-      crit: SEED.crit, authority: SEED.authority,
+      crit: SEED.crit, authority: SEED.authority, orgs: SEED.orgs,
       evals: Object.values(await evals()).filter((x) => x.ev.email === email).sort((a, b) => (a.updated < b.updated ? 1 : -1)),
     };
+    res.profiles = {}; for (const e of res.emps) if (SEED.profiles[e[0]]) res.profiles[e[0]] = SEED.profiles[e[0]];
     if (pu.role === 'admin') {
       res.settings.notify_email = st.notify_email || ''; res.settings.app_url = st.app_url || '';
       res.law = SEED.law; res.gaps = SEED.gaps;
@@ -168,7 +203,7 @@ const R = {
   async unlockData({ token, passphrase }) {
     await admin(token);
     let d; try { d = decrypt(passphrase); } catch { err('bad_key', 'مفتاح البيانات غير صحيح'); }
-    await setJSON('data', d); SEED = null; await loadData(); return {};
+    await setJSON('data', d); BASE = null; SEED = null; await loadData(); return {};
   },
   async logView({ token, kind, ref }) { const { email, u } = await auth(token); await logVisit(email, u.name, String(kind || 'view').slice(0, 20), ref); return {}; },
 
@@ -193,6 +228,7 @@ const R = {
       id, created: ex ? ex.created : ts, updated: ts, type: rec.type, period,
       emp: { id: e[0], name: e[1], code: e[2], dept: job.dept, br: e[4] || e[3], rep: e[6] || e[5] },
       a, b, ...c, n: { s: clip(n.s), d: clip(n.d), t: clip(n.t), g: clip(n.g) },
+      k: job.b.kpis.map((x) => ({ en: x.en, ar: x.ar, t_en: x.t_en, t_ar: x.t_ar, w: x.w })), cw: SEED.crit.map((x) => [x[0], x[1], x[2]]),
       ev: { email: ex ? ex.ev.email : email, name: String(rec.evName || u.name).slice(0, 80), title: String(rec.evTitle || u.title || '').slice(0, 80) },
       status: ex ? ex.status : 'new', read: false,
     };
@@ -215,6 +251,88 @@ const R = {
     const t = await getJSON('trash', {}); t[id] = { ...all[id], deleted: now(), deletedBy: me.email }; delete all[id];
     await setJSON('trash', t); await setJSON('evals', all); return {};
   },
+  async saveJob({ token, job, isNew }) {
+    await loadData(); const j = cleanJob(job || {}); await editor(token, 'jd', [j.dept, JOBS[j.code] && JOBS[j.code].dept]);
+    if (!/^[A-Z0-9][A-Z0-9-]{1,19}$/.test(j.code)) err('invalid', 'رمز الوظيفة غير صالح (أحرف إنجليزية وأرقام وشرطة، مثل LO-HR-05)');
+    if (!SEED.depts.some((d) => d.no === j.dept)) err('invalid', 'اختر القسم');
+    if (!j.ar && !j.en) err('invalid', 'اكتب المسمى الوظيفي');
+    if (isNew && JOBS[j.code]) err('exists', 'يوجد وصف وظيفي بنفس الرمز');
+    if (!isNew && !JOBS[j.code]) err('not_found', 'الوصف الوظيفي غير موجود');
+    checkKpis(j.b.kpis);
+    const ed = await getJSON('edits', {}); ed.jobs = ed.jobs || {}; ed.jobs[j.code] = j; await setJSON('edits', ed);
+    return { job: j };
+  },
+  async deleteJob({ token, code }) {
+    await admin(token); await loadData(); if (!JOBS[code]) err('not_found', 'الوصف الوظيفي غير موجود');
+    const n = SEED.emps.filter((e) => e[2] === code).length; if (n) err('in_use', 'لا يمكن حذف الوصف: عليه ' + n + ' موظف. انقلهم لوظيفة أخرى أولاً');
+    const ed = await getJSON('edits', {}); ed.jobs = ed.jobs || {};
+    if (BASE.jobs.some((x) => x.code === code)) ed.jobs[code] = null; else delete ed.jobs[code];
+    await setJSON('edits', ed); return {};
+  },
+  async revertJob({ token, code }) {
+    await admin(token); await loadData(); const ed = await getJSON('edits', {});
+    if (!BASE.jobs.some((x) => x.code === code)) err('invalid', 'هذا وصف مضاف وليس له نسخة أصلية');
+    if (ed.jobs) delete ed.jobs[code]; await setJSON('edits', ed); return {};
+  },
+  async saveEmp({ token, emp, isNew }) {
+    await loadData(); const s = (v, n = 120) => String(v == null ? '' : v).trim().slice(0, n); emp = emp || {};
+    const e = [s(emp.id, 30), s(emp.name), s(emp.code, 20), s(emp.br_en), s(emp.br_ar), s(emp.rep), s(emp.rep_ar)];
+    if (!e[0] || !e[1]) err('invalid', 'اكتب الرقم الوظيفي والاسم');
+    if (!JOBS[e[2]]) err('invalid', 'اختر الوظيفة');
+    const old = SEED.emps.find((x) => x[0] === e[0]);
+    if (isNew && old) err('exists', 'يوجد موظف بنفس الرقم الوظيفي'); if (!isNew && !old) err('not_found', 'الموظف غير موجود');
+    const me = await editor(token, 'emp', [JOBS[e[2]].dept, old && empDept(old)]);
+    const ed = await getJSON('edits', {}); ed.emps = ed.emps || {}; ed.profiles = ed.profiles || {}; ed.emps[e[0]] = e;
+    const pf = { ...(ed.profiles[e[0]] || {}) }, f = emp.profile || {};
+    for (const k of PROFILE_KEYS) if (f[k] !== undefined) pf[k] = s(f[k], k === 'notes' ? 1500 : 200);
+    pf.history = pf.history || [];
+    if (isNew) pf.history.push({ d: now(), t: 'hire', to: e[2], by: me.email });
+    else if (old[2] !== e[2]) pf.history.push({ d: now(), t: 'move', from: old[2], to: e[2], fd: empDept(old), td: JOBS[e[2]].dept, by: me.email });
+    pf.history = pf.history.slice(-50); ed.profiles[e[0]] = pf;
+    await setJSON('edits', ed); return { emp: e, profile: pf };
+  },
+  async deleteEmp({ token, id }) {
+    await loadData(); const old = SEED.emps.find((x) => x[0] === id); if (!old) err('not_found', 'الموظف غير موجود');
+    await editor(token, 'emp', [empDept(old)]);
+    const ed = await getJSON('edits', {}); ed.emps = ed.emps || {};
+    if (BASE.emps.some((x) => x[0] === id)) ed.emps[id] = null; else delete ed.emps[id];
+    await setJSON('edits', ed); return {};
+  },
+  async saveDept({ token, dept, isNew }) {
+    await admin(token); await loadData(); const s = (v) => String(v == null ? '' : v).trim().slice(0, 150);
+    const no = isNew ? Math.max(0, ...SEED.depts.map((d) => d.no)) + 1 : Number(dept && dept.no);
+    if (!isNew && !SEED.depts.some((d) => d.no === no)) err('not_found', 'القسم غير موجود');
+    const d = { no, en: s(dept.en), ar: s(dept.ar), head: s(dept.head), head_ar: s(dept.head_ar), rep: s(dept.rep), rep_ar: s(dept.rep_ar) };
+    if (!d.ar && !d.en) err('invalid', 'اكتب اسم القسم');
+    const ed = await getJSON('edits', {}); ed.depts = ed.depts || {}; ed.depts[String(no)] = d; await setJSON('edits', ed); return { dept: d };
+  },
+  async setPhoto({ token, id, photo }) {
+    await loadData(); const e = SEED.emps.find((x) => x[0] === id); if (!e) err('not_found', 'الموظف غير موجود');
+    await editor(token, 'emp', [empDept(e)]);
+    const ed = await getJSON('edits', {}); ed.profiles = ed.profiles || {}; const pf = ed.profiles[id] = ed.profiles[id] || {};
+    if (photo) { if (typeof photo !== 'string' || !/^data:image\/(jpeg|png|webp);base64,/.test(photo) || photo.length > 300000) err('invalid', 'الصورة كبيرة جداً أو بصيغة غير مدعومة'); await setJSON('photo/' + id, { p: photo }); pf.ph = Date.now(); }
+    else { await store().delete('photo/' + id); delete pf.ph; }
+    await setJSON('edits', ed); return { ph: pf.ph || 0 };
+  },
+  async getPhoto({ token, id }) {
+    await loadData(); const { email, u } = await auth(token), pu = publicUser(email, u); const e = SEED.emps.find((x) => x[0] === id); if (!e) err('not_found', 'الموظف غير موجود');
+    if (pu.depts !== 'ALL' && !pu.depts.includes(empDept(e))) err('forbidden', 'هذا الموظف ليس ضمن قسمك');
+    const r = await getJSON('photo/' + id, null); return { photo: r ? r.p : '' };
+  },
+  async saveOrgs({ token, orgs }) {
+    await admin(token); const s = (v) => String(v == null ? '' : v).trim().slice(0, 120), o = orgs || {};
+    const id = (v) => s(v).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 20);
+    const companies = (o.companies || []).map((c) => ({ id: id(c.id) || ('C' + Math.random().toString(36).slice(2, 7)), ar: s(c.ar), en: s(c.en), logo: typeof c.logo === 'string' && c.logo.startsWith('data:image/') && c.logo.length < 80000 ? c.logo : '' })).filter((c) => c.ar || c.en).slice(0, 50);
+    const brands = (o.brands || []).map((c) => ({ id: id(c.id) || ('B' + Math.random().toString(36).slice(2, 7)), ar: s(c.ar), en: s(c.en), company: id(c.company) })).filter((c) => c.ar || c.en).slice(0, 100);
+    const ed = await getJSON('edits', {}); ed.orgs = { companies, brands }; await setJSON('edits', ed); return { orgs: ed.orgs };
+  },
+  async saveCrit({ token, crit }) {
+    await admin(token); await loadData(); const s = (v, n = 600) => String(v == null ? '' : v).trim().slice(0, n);
+    const c = (Array.isArray(crit) ? crit : []).map((x) => [s(x[0], 120), s(x[1], 120), Math.round(Number(x[2]) * 100) / 100 || 0, s(x[3]), s(x[4])]).filter((x) => x[0] || x[1]);
+    if (c.length < 1 || c.length > 15) err('invalid', 'عدد المعايير بين 1 و 15');
+    const sum = c.reduce((t, x) => t + x[2], 0); if (c.some((x) => x[2] <= 0) || Math.abs(sum - 100) > 0.5) err('invalid', 'مجموع أوزان المعايير يجب أن يساوي 100% (الحالي ' + sum + '%)');
+    const ed = await getJSON('edits', {}); ed.crit = c; await setJSON('edits', ed); return {};
+  },
   async listTrash({ token }) { await admin(token); return { evals: Object.values(await getJSON('trash', {})).sort((a, b) => (a.deleted < b.deleted ? 1 : -1)) }; },
   async restoreEval({ token, id }) {
     await admin(token); const t = await getJSON('trash', {}), all = await evals(); if (!t[id]) err('not_found', 'التقييم غير موجود في السلة');
@@ -231,7 +349,7 @@ const R = {
   async listUsers({ token }) {
     const { all } = await admin(token), ev = Object.values(await evals()), vis = await getJSON('visits', []);
     return { users: Object.entries(all).map(([email, u]) => ({
-      email, name: u.name, title: u.title || '', role: u.role, depts: deptList(u), allJD: !!u.allJD, active: u.active !== false,
+      email, name: u.name, title: u.title || '', role: u.role, depts: deptList(u), allJD: !!u.allJD, active: u.active !== false, perms: permsOf(u),
       activated: !!u.hash, code: u.hash ? '' : (u.code || ''), created: u.created || '', lastLogin: u.last_login || '',
       logins: u.visits || 0, actions: vis.filter((v) => v[1] === email).length, evals: ev.filter((x) => x.ev.email === email).length })) };
   },
@@ -242,7 +360,7 @@ const R = {
     if (role !== 'admin' && !depts.length) err('invalid', 'حدد قسماً واحداً على الأقل للمدير');
     if (email === me.email && (role !== 'admin' || d.active === false)) err('invalid', 'لا يمكنك إزالة صلاحية المدير أو إيقاف حسابك');
     const cur = all[email]; let code = '';
-    all[email] = { ...(cur || {}), name: String(d.name || '').slice(0, 80), title: String(d.title || '').slice(0, 80), role, depts, allJD: !!d.allJD, active: d.active !== false };
+    all[email] = { ...(cur || {}), name: String(d.name || '').slice(0, 80), title: String(d.title || '').slice(0, 80), role, depts, allJD: !!d.allJD, active: d.active !== false, perms: { jd: !!(d.perms && d.perms.jd), emp: !!(d.perms && d.perms.emp) } };
     if (!cur) { code = randCode(); all[email].code = code; all[email].created = now(); all[email].visits = 0; }
     await setJSON('users', all); return { code };
   },
