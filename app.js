@@ -52,7 +52,7 @@ var ICON = {
   law: 'M12 3v18M5 7h14M7 7l-3 7a3 3 0 0 0 6 0zM17 7l-3 7a3 3 0 0 0 6 0z',
   set: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z',
   menu: 'M3 6h18M3 12h18M3 18h18', print: 'M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v7H6z',
-  dl: 'M12 3v12M7 10l5 5 5-5M5 21h14', plus: 'M12 5v14M5 12h14', x: 'M6 6l12 12M18 6L6 18', back: 'M9 6l6 6-6 6'
+  dl: 'M12 3v12M7 10l5 5 5-5M5 21h14', trash: 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3', plus: 'M12 5v14M5 12h14', x: 'M6 6l12 12M18 6L6 18', back: 'M9 6l6 6-6 6'
 };
 function ic(n) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + ICON[n] + '"/></svg>'; }
 
@@ -602,9 +602,9 @@ function openEval(rec, admin) {
     if (!rec.read) { rec.read = true; api('markEval', { id: rec.id, read: true }).catch(function () {}); S.unread = Math.max(0, (S.unread || 1) - 1); updUnread(); var tr = $('[data-ev="' + rec.id + '"]'); if (tr) tr.classList.remove('unread'); }
     $('#mst').onchange = function () { setEvalStatus(rec, this.value); };
     $('#mdel').onclick = function (e) {
-      if (e.target.id === 'md') { $('#mdel').innerHTML = '<span class="confirm">حذف نهائي؟ <button class="btn danger sm" id="my">نعم، احذف</button><button class="btn sec sm" id="mn">إلغاء</button></span>'; }
+      if (e.target.id === 'md') { $('#mdel').innerHTML = '<span class="confirm">نقل إلى سلة المحذوفات؟ <button class="btn danger sm" id="my">نعم، احذف</button><button class="btn sec sm" id="mn">إلغاء</button></span>'; }
       if (e.target.id === 'mn') $('#mdel').innerHTML = '<button class="btn danger sm" id="md">حذف</button>';
-      if (e.target.id === 'my') api('deleteEval', { id: rec.id }).then(function () { S.inbox = (S.inbox || []).filter(function (x) { return x.id !== rec.id; }); closeModal(); toast('تم حذف التقييم'); route(); }).catch(function (er) { $('#mm').className = 'msg err'; $('#mm').textContent = er.message; });
+      if (e.target.id === 'my') api('deleteEval', { id: rec.id }).then(function () { S.inbox = (S.inbox || []).filter(function (x) { return x.id !== rec.id; }); closeModal(); toast('نُقل التقييم إلى سلة المحذوفات — يمكنك استرجاعه'); route(); }).catch(function (er) { $('#mm').className = 'msg err'; $('#mm').textContent = er.message; });
     };
   }
 }
@@ -616,9 +616,10 @@ function updUnread() { var u = $('#unread'); if (u) { u.textContent = S.unread; 
 /* ----- admin: inbox */
 var IF = { q: '', dept: '', rate: '', stat: '', per: '' };
 VIEWS.inbox = function (v) {
-  v.innerHTML = head('صندوق النتائج', 'كل التقييمات الواردة من رؤساء الأقسام — اضغط على أي تقييم لعرضه وطباعته', '', '<button class="btn sec" id="rf">تحديث</button><button class="btn sec" id="csv">' + ic('dl') + 'تصدير Excel</button><button class="btn pri" id="pa">' + ic('print') + 'طباعة المعروض</button>') + '<div id="ibx"><div class="loading" style="min-height:30vh"><div class="spin"></div></div></div>';
+  v.innerHTML = head('صندوق النتائج', 'كل التقييمات الواردة من رؤساء الأقسام — اضغط على أي تقييم لعرضه وطباعته', '', '<button class="btn sec" id="rf">تحديث</button><button class="btn sec" id="trs">' + ic('trash') + 'سلة المحذوفات</button><button class="btn sec" id="csv">' + ic('dl') + 'تصدير Excel</button><button class="btn pri" id="pa">' + ic('print') + 'طباعة المعروض</button>') + '<div id="ibx"><div class="loading" style="min-height:30vh"><div class="spin"></div></div></div>';
   var load = function () { return api('listEvals').then(function (r) { S.inbox = r.evals; S.unread = r.evals.filter(function (x) { return !x.read; }).length; updUnread(); drawInbox(); }).catch(function (e) { $('#ibx').innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; }); };
   $('#rf').onclick = load;
+  $('#trs').onclick = function () { trashModal(load); };
   $('#csv').onclick = function () { exportCSV(filteredInbox()); };
   $('#pa').onclick = function () { var l = filteredInbox(); if (!l.length) return toast('لا توجد تقييمات للطباعة'); printPapers(l.map(evalPaper)); };
   if (S.inbox) drawInbox(); load();
@@ -655,6 +656,27 @@ function drawInbox() {
     $('#' + x[0]).addEventListener(x[2], function () { IF[x[1]] = this.value; var l = filteredInbox(); $('#itb').innerHTML = evalTable(l, true); });
   });
   $('#itb').onclick = function (e) { var r = e.target.closest('[data-ev]'); if (!r) return; var rec = (S.inbox || []).filter(function (x) { return x.id === r.dataset.ev; })[0]; if (rec) openEval(rec, true); };
+}
+function trashModal(reload) {
+  var m = modal('<div class="mbox"><div class="card"><div class="hd"><h2>سلة المحذوفات</h2><span class="muted" style="font-size:12px">التقييمات المحذوفة — استرجعها أو احذفها نهائياً</span></div><div class="bd" id="tbx"><div class="loading" style="min-height:20vh"><div class="spin"></div></div></div><div class="bd" style="display:flex;gap:8px;justify-content:space-between;padding-top:0"><span id="tall"></span><button class="btn sec" data-close>إغلاق</button></div></div></div>');
+  var list = [];
+  var draw = function () {
+    var b = $('#tbx'); if (!b) return;
+    $('#tall').innerHTML = list.length ? '<button class="btn danger sm" id="tpa">إفراغ السلة</button>' : '';
+    b.innerHTML = !list.length ? '<div class="empty">السلة فارغة</div>' : '<div class="tw"><table class="t minw"><thead><tr><th>حُذف في</th><th>الموظف</th><th>المقيِّم</th><th>النوع / الفترة</th><th>النهائية</th><th></th></tr></thead><tbody>' +
+      list.map(function (r) {
+        return '<tr><td class="num" style="font-size:12px">' + esc(String(r.deleted || '').slice(0, 16)) + '</td><td>' + esc(r.emp.name) + '<div class="num muted" style="font-size:11px">' + esc(r.emp.id) + '</div></td><td>' + esc(r.ev.name) + '</td><td>' + (TYPE[r.type] ? TYPE[r.type][1] : esc(r.type)) + '<div class="num muted" style="font-size:11px">' + esc(r.period) + '</div></td><td class="num"><b>' + Number(r.F).toFixed(1) + '</b></td>' +
+          '<td class="w"><div class="actions"><button class="btn pri sm" data-rs="' + esc(r.id) + '">استرجاع</button><button class="btn danger sm" data-pg="' + esc(r.id) + '">حذف نهائي</button></div></td></tr>';
+      }).join('') + '</tbody></table></div>';
+  };
+  var load = function () { return api('listTrash').then(function (r) { list = r.evals; draw(); }).catch(function (e) { var b = $('#tbx'); if (b) b.innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; }); };
+  m.addEventListener('click', function (e) {
+    var t = e.target.closest('button'); if (!t) return;
+    if (t.dataset.rs) api('restoreEval', { id: t.dataset.rs }).then(function () { toast('تم استرجاع التقييم إلى صندوق النتائج'); load(); if (reload) reload(); }).catch(function (er) { toast(er.message); });
+    if (t.dataset.pg) { if (t.dataset.ok) api('purgeEval', { id: t.dataset.pg }).then(function () { toast('حُذف نهائياً'); load(); }).catch(function (er) { toast(er.message); }); else { t.dataset.ok = '1'; t.textContent = 'تأكيد الحذف النهائي'; } }
+    if (t.id === 'tpa') { if (t.dataset.ok) api('purgeEval', { id: '*' }).then(function () { toast('تم إفراغ السلة'); load(); }).catch(function (er) { toast(er.message); }); else { t.dataset.ok = '1'; t.textContent = 'تأكيد: حذف الكل نهائياً'; } }
+  });
+  load();
 }
 function exportCSV(list) {
   var q = function (v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; };

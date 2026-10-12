@@ -209,7 +209,23 @@ const R = {
     if (read !== undefined) all[id].read = !!read;
     await setJSON('evals', all); return {};
   },
-  async deleteEval({ token, id }) { await admin(token); const all = await evals(); delete all[id]; await setJSON('evals', all); return {}; },
+  async deleteEval({ token, id }) {
+    const me = await admin(token), all = await evals(); if (!all[id]) err('not_found', 'التقييم غير موجود');
+    const t = await getJSON('trash', {}); t[id] = { ...all[id], deleted: now(), deletedBy: me.email }; delete all[id];
+    await setJSON('trash', t); await setJSON('evals', all); return {};
+  },
+  async listTrash({ token }) { await admin(token); return { evals: Object.values(await getJSON('trash', {})).sort((a, b) => (a.deleted < b.deleted ? 1 : -1)) }; },
+  async restoreEval({ token, id }) {
+    await admin(token); const t = await getJSON('trash', {}), all = await evals(); if (!t[id]) err('not_found', 'التقييم غير موجود في السلة');
+    if (all[id]) err('exists', 'يوجد تقييم أحدث لنفس الموظف والنوع والفترة — احذفه أولاً ثم استرجع هذا');
+    const r = { ...t[id] }; delete r.deleted; delete r.deletedBy; all[id] = r; delete t[id];
+    await setJSON('evals', all); await setJSON('trash', t); return { eval: r };
+  },
+  async purgeEval({ token, id }) {
+    await admin(token); let t = await getJSON('trash', {});
+    if (id === '*') t = {}; else { if (!t[id]) err('not_found', 'التقييم غير موجود في السلة'); delete t[id]; }
+    await setJSON('trash', t); return {};
+  },
 
   async listUsers({ token }) {
     const { all } = await admin(token), ev = Object.values(await evals()), vis = await getJSON('visits', []);
