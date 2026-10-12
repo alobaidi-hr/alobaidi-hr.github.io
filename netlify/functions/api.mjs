@@ -66,6 +66,17 @@ function checkKpis(k) {
   if (k.some((x) => x.w <= 0)) err('invalid', 'كل مؤشر يحتاج وزناً أكبر من صفر');
   const sum = Math.round(k.reduce((t, x) => t + x.w, 0) * 100) / 100; if (Math.abs(sum - 100) > 0.5) err('invalid', 'مجموع أوزان المؤشرات يجب أن يساوي 100% (الحالي ' + sum + '%)');
 }
+const PURPOSES = ['periodic', 'raise', 'promo_raise', 'promo', 'move', 'confirm'];
+const REC_KEYS = ['PROMO', 'CONF', 'EXT', 'KEEP', 'DEV', 'PIP', 'TERM'];
+function cleanPurpose(p) {
+  p = p || {}; const s = (v, n) => String(v == null ? '' : v).trim().slice(0, n), num = (v) => { const x = Number(v); return Number.isFinite(x) && x >= 0 ? Math.round(x * 100) / 100 : null; };
+  const k = PURPOSES.includes(p.k) ? p.k : 'periodic';
+  const o = { k, why: s(p.why, 1500) };
+  if (k === 'raise' || k === 'promo_raise') { o.mode = p.mode === 'amt' ? 'amt' : 'pct'; o.val = num(p.val); if (o.mode === 'pct' && o.val > 100) err('invalid', 'نسبة الزيادة غير منطقية'); }
+  if (k === 'promo' || k === 'promo_raise' || k === 'move') { o.job = s(p.job, 20); o.txt = s(p.txt, 150); }
+  if (k !== 'periodic') o.date = s(p.date, 10);
+  return o;
+}
 const PROFILE_KEYS = ['phone', 'email', 'hire', 'birth', 'company', 'brand', 'grade', 'contract', 'nat', 'address', 'notes'];
 const empDept = (e) => (JOBS[e[2]] ? JOBS[e[2]].dept : 0);
 
@@ -228,10 +239,13 @@ const R = {
       id, created: ex ? ex.created : ts, updated: ts, type: rec.type, period,
       emp: { id: e[0], name: e[1], code: e[2], dept: job.dept, br: e[4] || e[3], rep: e[6] || e[5] },
       a, b, ...c, n: { s: clip(n.s), d: clip(n.d), t: clip(n.t), g: clip(n.g) },
+      pp: cleanPurpose(rec.pp), rcs: (Array.isArray(rec.rcs) ? rec.rcs : []).filter((x, i, a) => REC_KEYS.includes(x) && a.indexOf(x) === i),
       k: job.b.kpis.map((x) => ({ en: x.en, ar: x.ar, t_en: x.t_en, t_ar: x.t_ar, w: x.w })), cw: SEED.crit.map((x) => [x[0], x[1], x[2]]),
       ev: { email: ex ? ex.ev.email : email, name: String(rec.evName || u.name).slice(0, 80), title: String(rec.evTitle || u.title || '').slice(0, 80) },
       status: ex ? ex.status : 'new', read: false,
     };
+    const sf = Object.values(await getJSON('selfs', {})).filter((x) => x.status === 'done' && x.emp.id === e[0] && x.type === rec.type && x.period === period).sort((a, b) => (a.submitted < b.submitted ? 1 : -1))[0];
+    if (sf) out.self = { code: sf.code, a: sf.a, b: sf.b, A: sf.A, B: sf.B, F: sf.F, r: sf.r, n: sf.n, at: sf.submitted };
     all[id] = out; await setJSON('evals', all);
     await logVisit(email, u.name, ex ? 'eval-update' : 'eval-submit', e[0] + ' ' + period);
     return { eval: out };
@@ -332,6 +346,50 @@ const R = {
     if (c.length < 1 || c.length > 15) err('invalid', 'عدد المعايير بين 1 و 15');
     const sum = c.reduce((t, x) => t + x[2], 0); if (c.some((x) => x[2] <= 0) || Math.abs(sum - 100) > 0.5) err('invalid', 'مجموع أوزان المعايير يجب أن يساوي 100% (الحالي ' + sum + '%)');
     const ed = await getJSON('edits', {}); ed.crit = c; await setJSON('edits', ed); return {};
+  },
+  /* ---------- employee self-assessment (link + code, no account needed) ---------- */
+  async createSelf({ token, empId, type, period }) {
+    await loadData(); const { email, u } = await auth(token), pu = publicUser(email, u);
+    const e = SEED.emps.find((x) => x[0] === String(empId)); if (!e) err('not_found', 'الموظف غير موجود');
+    const job = JOBS[e[2]]; if (pu.depts !== 'ALL' && !pu.depts.includes(job.dept)) err('forbidden', 'هذا الموظف ليس ضمن قسمك');
+    if (!TYPES[type]) err('invalid', 'نوع التقييم غير صالح'); period = String(period || '').slice(0, 20); if (!period) err('invalid', 'حدد الفترة');
+    const all = await getJSON('selfs', {});
+    const open = Object.values(all).find((x) => x.emp.id === e[0] && x.type === type && x.period === period && x.status === 'open'); if (open) return { self: open };
+    const code = crypto.randomBytes(9).toString('base64url');
+    const x = { code, emp: { id: e[0], name: e[1], code: e[2], dept: job.dept }, type, period, by: email, byName: u.name, created: now(), status: 'open',
+      k: job.b.kpis.map((k) => ({ en: k.en, ar: k.ar, t_en: k.t_en, t_ar: k.t_ar, w: k.w })), cw: SEED.crit.map((c) => [c[0], c[1], c[2], c[3], c[4]]) };
+    all[code] = x; await setJSON('selfs', all); await logVisit(email, u.name, 'self-request', e[0] + ' ' + period); return { self: x };
+  },
+  async listSelf({ token }) {
+    await loadData(); const { email, u } = await auth(token), pu = publicUser(email, u);
+    return { selfs: Object.values(await getJSON('selfs', {})).filter((x) => pu.depts === 'ALL' || pu.depts.includes(x.emp.dept)).sort((a, b) => (a.created < b.created ? 1 : -1)) };
+  },
+  async deleteSelf({ token, code }) {
+    const { email, u } = await auth(token), pu = publicUser(email, u), all = await getJSON('selfs', {}), x = all[code]; if (!x) err('not_found', 'الطلب غير موجود');
+    if (pu.role !== 'admin' && x.by !== email) err('forbidden', 'يمكن حذف الطلب من منشئه أو الموارد البشرية');
+    delete all[code]; await setJSON('selfs', all); return {};
+  },
+  async selfForm({ code }) {
+    const x = (await getJSON('selfs', {}))[String(code || '')]; if (!x) err('not_found', 'الرابط غير صالح أو انتهت صلاحيته');
+    const st = await settings();
+    return { self: { emp: x.emp, type: x.type, period: x.period, k: x.k, cw: x.cw, status: x.status, a: x.a, b: x.b, n: x.n, F: x.F, r: x.r, submitted: x.submitted, byName: x.byName }, settings: publicSettings(st) };
+  },
+  async selfSubmit({ code, a, b, n }) {
+    const all = await getJSON('selfs', {}), x = all[String(code || '')]; if (!x) err('not_found', 'الرابط غير صالح أو انتهت صلاحيته');
+    if (x.status === 'done') err('locked', 'تم إرسال التقييم الذاتي مسبقاً');
+    a = (a || []).map((v) => score(v, true)); b = (b || []).map((v) => score(v, false));
+    if (a.length !== x.k.length || b.length !== x.cw.length) err('invalid', 'أكمل جميع الدرجات');
+    if (a.every((v) => v === null)) err('invalid', 'قيّم مؤشراً واحداً على الأقل');
+    let sw = 0, ss = 0; x.k.forEach((k, i) => { if (a[i] !== null) { sw += k.w; ss += k.w * a[i]; } });
+    let bw = 0, bs = 0; x.cw.forEach((c, i) => { bw += c[2]; bs += c[2] * b[i]; });
+    const r1 = (v) => Math.round(v * 10) / 10, A = r1(ss / sw * 10), B = r1(bs / bw * 10), F = r1(0.6 * A + 0.4 * B);
+    const clip = (v) => String(v || '').slice(0, 1500); n = n || {};
+    Object.assign(x, { a, b, A, B, F, r: F >= 85 ? 3 : F >= 70 ? 2 : F >= 55 ? 1 : 0, n: { ach: clip(n.ach), ch: clip(n.ch), t: clip(n.t), g: clip(n.g) }, status: 'done', submitted: now() });
+    await setJSON('selfs', all);
+    const ev = await evals(); let ch = false;
+    for (const r of Object.values(ev)) if (r.emp.id === x.emp.id && r.type === x.type && r.period === x.period) { r.self = { code: x.code, a, b, A, B, F, r: x.r, n: x.n, at: x.submitted }; ch = true; }
+    if (ch) await setJSON('evals', ev);
+    return { F, r: x.r };
   },
   async listTrash({ token }) { await admin(token); return { evals: Object.values(await getJSON('trash', {})).sort((a, b) => (a.deleted < b.deleted ? 1 : -1)) }; },
   async restoreEval({ token, id }) {
