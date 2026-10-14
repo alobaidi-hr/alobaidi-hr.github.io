@@ -77,6 +77,8 @@ function cleanPurpose(p) {
   if (k !== 'periodic') o.date = s(p.date, 10);
   return o;
 }
+const cleanSig = (x) => (typeof x === 'string' && /^data:image\/(png|jpeg|webp);base64,/.test(x) && x.length < 90000 ? x : '');
+const WF_NAMES = { employee: 'بانتظار توقيع الموظف', hr: 'مراجعة الموارد البشرية', gm: 'عند المدير العام', ceo: 'عند الرئيس التنفيذي', returned: 'مُعاد للمقيّم', done: 'معتمد نهائياً' };
 const PROFILE_KEYS = ['phone', 'email', 'hire', 'birth', 'company', 'brand', 'grade', 'contract', 'nat', 'address', 'notes'];
 const empDept = (e) => (JOBS[e[2]] ? JOBS[e[2]].dept : 0);
 
@@ -90,9 +92,11 @@ async function users() {
 }
 const hash = (pw, salt) => crypto.pbkdf2Sync(String(pw), salt, 120000, 32, 'sha256').toString('base64');
 const randCode = () => crypto.randomBytes(3).toString('hex').toUpperCase();
-const deptList = (u) => (u.role === 'admin' ? 'ALL' : (u.depts || []).map(Number));
+const ROLES = ['admin', 'manager', 'gm', 'ceo'];
+const roleOf = (u) => (ROLES.includes(u.role) ? u.role : 'manager');
+const deptList = (u) => (roleOf(u) === 'manager' ? (u.depts || []).map(Number) : 'ALL');
 const permsOf = (u) => (u.role === 'admin' ? { jd: true, emp: true } : { jd: !!(u.perms && u.perms.jd), emp: !!(u.perms && u.perms.emp) });
-const publicUser = (email, u) => ({ email, name: u.name, title: u.title || '', role: u.role === 'admin' ? 'admin' : 'manager', depts: deptList(u), allJD: u.role === 'admin' || !!u.allJD, perms: permsOf(u) });
+const publicUser = (email, u) => ({ email, name: u.name, title: u.title || '', role: roleOf(u), depts: deptList(u), allJD: roleOf(u) !== 'manager' || !!u.allJD, perms: permsOf(u), sig: u.sig || '' });
 /* admin, or a manager given the edit permission — limited to his own departments */
 async function editor(token, kind, depts) {
   const a = await auth(token), pu = publicUser(a.email, a.u); if (pu.role === 'admin') return a;
@@ -234,6 +238,8 @@ const R = {
     let ex = rec.id && all[rec.id] && (all[rec.id].ev.email === email || pu.role === 'admin') ? all[rec.id] : null;
     if (!rec.id) ex = Object.values(all).find((x) => x.ev.email === email && x.emp.id === e[0] && x.type === rec.type && x.period === period) || null;
     if (ex && ex.status === 'signed') err('locked', 'هذا التقييم موقّع ومحفوظ ولا يمكن تعديله. راجع الموارد البشرية.');
+    if (ex && ex.wf && !['employee', 'returned'].includes(ex.wf.stage) && pu.role !== 'admin') err('locked', 'التقييم قيد الاعتماد ولا يمكن تعديله الآن. راجع الموارد البشرية.');
+    const sig = cleanSig(rec.sig) || (u.sig || ''); if (!sig) err('invalid', 'التوقيع الإلكتروني للمقيّم مطلوب');
     const ts = now(), id = ex ? ex.id : crypto.randomBytes(5).toString('hex').toUpperCase();
     const out = {
       id, created: ex ? ex.created : ts, updated: ts, type: rec.type, period,
@@ -244,6 +250,8 @@ const R = {
       ev: { email: ex ? ex.ev.email : email, name: String(rec.evName || u.name).slice(0, 80), title: String(rec.evTitle || u.title || '').slice(0, 80) },
       status: ex ? ex.status : 'new', read: false,
     };
+    out.wf = { stage: 'employee', ceo: false, ack: (ex && ex.wf && ex.wf.ack) || crypto.randomBytes(9).toString('base64url'),
+      sig: { mgr: { name: out.ev.name, title: out.ev.title, email: out.ev.email, at: ts, img: sig } }, log: ((ex && ex.wf && ex.wf.log) || []).concat([{ at: ts, by: u.name, act: ex ? 'resubmit' : 'submit' }]).slice(-40) };
     const sf = Object.values(await getJSON('selfs', {})).filter((x) => x.status === 'done' && x.emp.id === e[0] && x.type === rec.type && x.period === period).sort((a, b) => (a.submitted < b.submitted ? 1 : -1))[0];
     if (sf) out.self = { code: sf.code, a: sf.a, b: sf.b, A: sf.A, B: sf.B, F: sf.F, r: sf.r, n: sf.n, at: sf.submitted };
     all[id] = out; await setJSON('evals', all);
@@ -391,6 +399,54 @@ const R = {
     if (ch) await setJSON('evals', ev);
     return { F, r: x.r };
   },
+  /* ---------- approvals: employee › HR review › GM final approval › (CEO, optional) ---------- */
+  async setMySig({ token, img }) {
+    const { email, all } = await auth(token); const s = img ? cleanSig(img) : ''; if (img && !s) err('invalid', 'التوقيع غير صالح');
+    all[email].sig = s; await setJSON('users', all); return { sig: s };
+  },
+  async ackForm({ code }) {
+    const r = Object.values(await evals()).find((x) => x.wf && x.wf.ack === String(code || '')); if (!r) err('not_found', 'الرابط غير صالح أو انتهت صلاحيته');
+    const st = await settings();
+    return { eval: { id: r.id, emp: r.emp, type: r.type, period: r.period, k: r.k, cw: r.cw, a: r.a, b: r.b, A: r.A, B: r.B, F: r.F, r: r.r, n: r.n, pp: r.pp, ev: { name: r.ev.name, title: r.ev.title }, stage: r.wf.stage, empSig: r.wf.sig.emp || null }, settings: publicSettings(st) };
+  },
+  async ackSign({ code, img, note }) {
+    const all = await evals(), r = Object.values(all).find((x) => x.wf && x.wf.ack === String(code || '')); if (!r) err('not_found', 'الرابط غير صالح أو انتهت صلاحيته');
+    if (r.wf.stage !== 'employee') err('locked', 'تم توقيع هذا التقييم مسبقاً');
+    const sig = cleanSig(img); if (!sig) err('invalid', 'التوقيع مطلوب'); const ts = now();
+    r.wf.sig.emp = { name: r.emp.name, at: ts, img: sig }; r.n.e = String(note || '').slice(0, 1500); r.wf.stage = 'hr'; r.read = false; r.updated = ts;
+    r.wf.log.push({ at: ts, by: r.emp.name, act: 'employee-sign' }); await setJSON('evals', all); return { stage: 'hr' };
+  },
+  async wfAction({ token, id, act, img, note, ceo }) {
+    const { email, u } = await auth(token), role = roleOf(u), all = await evals(), r = all[id]; if (!r) err('not_found', 'التقييم غير موجود');
+    const ts = now(), sig = cleanSig(img) || u.sig || '', who = { name: u.name, title: u.title || '', email, at: ts, img: sig };
+    note = String(note || '').slice(0, 600);
+    if (!r.wf) r.wf = { stage: 'hr', ceo: false, ack: crypto.randomBytes(9).toString('base64url'), sig: {}, log: [] };
+    const need = (st, roles) => { if (!roles.includes(role)) err('forbidden', 'ليست لديك صلاحية هذا الإجراء'); if (!st.includes(r.wf.stage)) err('invalid', 'المرحلة الحالية: ' + WF_NAMES[r.wf.stage]); };
+    const needSig = () => { if (!sig) err('invalid', 'التوقيع الإلكتروني مطلوب'); };
+    if (act === 'hr_forward') {
+      need(['hr', 'employee'], ['admin']); needSig();
+      if (r.wf.stage === 'employee') r.wf.sig.emp = { name: r.emp.name, at: ts, paper: true };
+      r.wf.sig.hr = who; r.wf.ceo = !!ceo; r.wf.stage = 'gm';
+    } else if (act === 'hr_return') { need(['hr', 'employee'], ['admin']); r.wf.stage = 'returned'; r.wf.sig = { mgr: r.wf.sig.mgr }; }
+    else if (act === 'gm_approve') { need(['gm'], ['gm']); needSig(); r.wf.sig.gm = who; r.wf.stage = r.wf.ceo ? 'ceo' : 'done'; }
+    else if (act === 'gm_return') { need(['gm'], ['gm']); r.wf.stage = 'hr'; delete r.wf.sig.hr; }
+    else if (act === 'ceo_approve') { need(['ceo'], ['ceo']); needSig(); r.wf.sig.ceo = who; r.wf.stage = 'done'; }
+    else if (act === 'ceo_return') { need(['ceo'], ['ceo']); r.wf.stage = 'hr'; delete r.wf.sig.hr; delete r.wf.sig.gm; }
+    else if (act === 'set_ceo') { need(['hr', 'gm', 'employee'], ['admin']); r.wf.ceo = !!ceo; }
+    else err('bad_action', 'إجراء غير معروف');
+    if (r.wf.stage === 'done') r.status = 'signed';
+    r.wf.log.push({ at: ts, by: u.name, act, note }); r.updated = ts; await setJSON('evals', all);
+    await logVisit(email, u.name, 'wf-' + act, r.emp.id); return { eval: r };
+  },
+  async listApprovals({ token }) {
+    const { email, u } = await auth(token), role = roleOf(u); const l = Object.values(await evals());
+    let out = [];
+    if (role === 'admin') out = l.filter((x) => x.wf && x.wf.stage !== 'done');
+    else if (role === 'gm') out = l.filter((x) => x.wf && (x.wf.stage === 'gm' || (x.wf.sig.gm && x.wf.sig.gm.email === email)));
+    else if (role === 'ceo') out = l.filter((x) => x.wf && (x.wf.stage === 'ceo' || (x.wf.sig.ceo && x.wf.sig.ceo.email === email)));
+    else out = l.filter((x) => x.ev.email === email && x.wf);
+    return { evals: out.sort((a, b) => (a.updated < b.updated ? 1 : -1)) };
+  },
   async listTrash({ token }) { await admin(token); return { evals: Object.values(await getJSON('trash', {})).sort((a, b) => (a.deleted < b.deleted ? 1 : -1)) }; },
   async restoreEval({ token, id }) {
     await admin(token); const t = await getJSON('trash', {}), all = await evals(); if (!t[id]) err('not_found', 'التقييم غير موجود في السلة');
@@ -414,8 +470,8 @@ const R = {
   async saveUser({ token, user: d = {} }) {
     const me = await admin(token), all = me.all, email = lower(d.email);
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) err('invalid', 'البريد الإلكتروني غير صالح');
-    const role = d.role === 'admin' ? 'admin' : 'manager', depts = role === 'admin' ? [] : (d.depts || []).map(Number).filter((n) => n > 0);
-    if (role !== 'admin' && !depts.length) err('invalid', 'حدد قسماً واحداً على الأقل للمدير');
+    const role = ROLES.includes(d.role) ? d.role : 'manager', depts = role !== 'manager' ? [] : (d.depts || []).map(Number).filter((n) => n > 0);
+    if (role === 'manager' && !depts.length) err('invalid', 'حدد قسماً واحداً على الأقل للمدير');
     if (email === me.email && (role !== 'admin' || d.active === false)) err('invalid', 'لا يمكنك إزالة صلاحية المدير أو إيقاف حسابك');
     const cur = all[email]; let code = '';
     all[email] = { ...(cur || {}), name: String(d.name || '').slice(0, 80), title: String(d.title || '').slice(0, 80), role, depts, allJD: !!d.allJD, active: d.active !== false, perms: { jd: !!(d.perms && d.perms.jd), emp: !!(d.perms && d.perms.emp) } };
