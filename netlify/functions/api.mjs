@@ -153,6 +153,26 @@ const score = (v, allowNull) => {
   const n = Number(v); if (!(n >= 0 && n <= 10) || Math.round(n) !== n) err('invalid', 'درجة غير صالحة'); return n;
 };
 async function evals() { return getJSON('evals', {}); }
+/* incoming box for managers / GM / CEO: evaluations and self-assessments that reach them */
+async function boxItems(email, u) {
+  const role = roleOf(u), pu = publicUser(email, u), inD = (d) => pu.depts === 'ALL' || pu.depts.includes(Number(d)), out = [];
+  for (const x of Object.values(await evals())) {
+    const w = x.wf || null, st = w ? w.stage : '';
+    let take = false, act = false, why = '';
+    if (role === 'gm') { take = !!(w && (st === 'gm' || st === 'ceo' || st === 'done' || (w.sig && w.sig.gm))); act = st === 'gm'; why = act ? 'بانتظار اعتمادك ومصادقتك' : st === 'done' ? 'معتمد نهائياً' : ''; }
+    else if (role === 'ceo') { take = !!(w && w.ceo && (st === 'ceo' || st === 'done')); act = st === 'ceo'; why = act ? 'حالة استثنائية بانتظار مصادقتك' : 'تمت المصادقة'; }
+    else if (role === 'manager') { take = x.ev.email === email || inD(x.emp.dept); act = !!(w && st === 'returned' && x.ev.email === email); why = act ? 'أُعيد إليك للتعديل' : x.ev.email === email ? (w && st === 'done' ? 'اعتُمد تقييمك نهائياً' : w && st === 'hr' ? 'وقّع الموظف — لدى الموارد البشرية' : w && (st === 'gm' || st === 'ceo') ? 'قيد الاعتماد لدى الإدارة' : '') : 'تقييم لموظف في قسمك'; }
+    else if (role === 'admin') { take = !!(w && st === 'hr'); act = take; why = 'وقّع الموظف — بانتظار مراجعتك'; }
+    if (take) out.push({ k: 'eval', key: 'e:' + x.id, at: x.updated, act, why, eval: x });
+  }
+  if (role === 'manager' || role === 'admin') for (const x of Object.values(await getJSON('selfs', {}))) {
+    if (x.status !== 'done' || !(x.by === email || (role === 'manager' && inD(x.emp.dept)))) continue;
+    out.push({ k: 'self', key: 's:' + x.code, at: x.submitted, act: false, why: 'وصل التقييم الذاتي للموظف', self: { code: x.code, emp: x.emp, type: x.type, period: x.period, F: x.F, r: x.r, submitted: x.submitted } });
+  }
+  const seen = ((await getJSON('seen', {}))[email]) || {};
+  for (const i of out) i.unread = !seen[i.key] || seen[i.key] < i.at;
+  return out.sort((a, b) => (Number(b.act) - Number(a.act)) || (a.at < b.at ? 1 : -1));
+}
 
 /* ---------- routes ---------- */
 const R = {
@@ -214,6 +234,7 @@ const R = {
       res.law = SEED.law; res.gaps = SEED.gaps;
       res.unread = Object.values(await evals()).filter((x) => !x.read).length;
     }
+    res.boxUnread = (await boxItems(email, u)).filter((i) => i.unread).length;
     return res;
   },
   async unlockData({ token, passphrase }) {
@@ -438,6 +459,13 @@ const R = {
     if (r.wf.stage === 'done') r.status = 'signed';
     r.wf.log.push({ at: ts, by: u.name, act, note }); r.updated = ts; await setJSON('evals', all);
     await logVisit(email, u.name, 'wf-' + act, r.emp.id); return { eval: r };
+  },
+  async myBox({ token }) { const { email, u } = await auth(token); const items = await boxItems(email, u); return { items, unread: items.filter((i) => i.unread).length }; },
+  async boxSeen({ token, keys }) {
+    const { email, u } = await auth(token), items = await boxItems(email, u), want = keys === 'all' ? null : new Set((Array.isArray(keys) ? keys : []).map(String));
+    const all = await getJSON('seen', {}), m = all[email] || {};
+    for (const i of items) if (!want || want.has(i.key)) m[i.key] = i.at;
+    all[email] = m; await setJSON('seen', all); return { unread: items.filter((i) => !m[i.key] || m[i.key] < i.at).length };
   },
   async listApprovals({ token }) {
     const { email, u } = await auth(token), role = roleOf(u); const l = Object.values(await evals());
