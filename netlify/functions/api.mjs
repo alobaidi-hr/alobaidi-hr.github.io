@@ -5,7 +5,8 @@
 import { getStore } from '@netlify/blobs';
 import crypto from 'node:crypto';
 import PUB from '../../data/seed.public.json' with { type: 'json' };
-import ENC from '../../data/seed.enc.json' with { type: 'json' };
+let ENC = null;
+async function loadEnc() { if (ENC) return ENC; for (const u of ['https://alobaidi-hr.github.io/data/seed.enc.json', 'https://raw.githubusercontent.com/alobaidi-hr/alobaidi-hr.github.io/main/data/seed.enc.json']) { try { const r = await fetch(u); if (r.ok) { ENC = await r.json(); return ENC; } } catch {} } err('seed_unavailable', 'تعذّر تحميل ملف البيانات المشفّر'); }
 
 const SESSION_MS = 8 * 60 * 60 * 1000;
 const MAX_FAILS = 6;
@@ -217,7 +218,7 @@ const R = {
   },
   async unlockData({ token, passphrase }) {
     await admin(token);
-    let d; try { d = decrypt(passphrase); } catch { err('bad_key', 'مفتاح البيانات غير صحيح'); }
+    await loadEnc(); let d; try { d = decrypt(passphrase); } catch { err('bad_key', 'مفتاح البيانات غير صحيح'); }
     await setJSON('data', d); BASE = null; SEED = null; await loadData(); return {};
   },
   async logView({ token, kind, ref }) { const { email, u } = await auth(token); await logVisit(email, u.name, String(kind || 'view').slice(0, 20), ref); return {}; },
