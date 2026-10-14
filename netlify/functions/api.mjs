@@ -5,6 +5,7 @@
 import { getStore } from '@netlify/blobs';
 import crypto from 'node:crypto';
 import PUB from '../../data/seed.public.json' with { type: 'json' };
+import MIGRATIONS from '../../data/migrations.json' with { type: 'json' };
 let ENC = null;
 async function loadEnc() { if (ENC) return ENC; for (const u of ['https://alobaidi-hr.github.io/data/seed.enc.json', 'https://raw.githubusercontent.com/alobaidi-hr/alobaidi-hr.github.io/main/data/seed.enc.json']) { try { const r = await fetch(u); if (r.ok) { ENC = await r.json(); return ENC; } } catch {} } err('seed_unavailable', 'تعذّر تحميل ملف البيانات المشفّر'); }
 
@@ -41,8 +42,34 @@ function applyEdits(B, ed) {
 async function loadData(required = true) {
   if (!BASE) { const d = await getJSON('data', null); if (d) BASE = { ...PUB, ...d }; }
   if (!BASE) { SEED = null; if (required) err('locked_data', 'بيانات النظام بانتظار التفعيل من مدير الموارد البشرية.'); return null; }
-  SEED = applyEdits(BASE, await getJSON('edits', {})); JOBS = Object.fromEntries(SEED.jobs.map((j) => [j.code, j]));
+  let ed = await getJSON('edits', {});
+  if (MIGRATIONS.some((m) => !(ed.applied || []).includes(m.id))) { ed = runMigrations(BASE, ed); await setJSON('edits', ed); }
+  SEED = applyEdits(BASE, ed); JOBS = Object.fromEntries(SEED.jobs.map((j) => [j.code, j]));
   return SEED;
+}
+/* one-time data changes requested by HR, applied on top of the live edits (never twice) */
+function runMigrations(B, ed) {
+  ed = { ...ed, applied: [...(ed.applied || [])] };
+  for (const m of MIGRATIONS) {
+    if (ed.applied.includes(m.id)) continue;
+    const cur = () => applyEdits(B, ed), jobOf = (c) => cur().jobs.find((j) => j.code === c);
+    const putJob = (j) => { ed.jobs = { ...(ed.jobs || {}), [j.code]: j }; };
+    const putEmp = (e) => { ed.emps = { ...(ed.emps || {}), [e[0]]: e }; };
+    for (const o of m.ops) {
+      if (o.op === 'addJob' && !jobOf(o.job.code)) putJob(cleanJob(o.job));
+      else if (o.op === 'jobReportsTo') for (const c of o.codes) { const j = jobOf(c); if (j) putJob({ ...j, b: { ...j.b, ov: { ...j.b.ov, 'Reports To': o.value } } }); }
+      else if (o.op === 'jobText') { const j = jobOf(o.code); if (j) putJob({ ...j, b: { ...j.b, duties: j.b.duties.map((p) => p.map((t) => String(t).split(o.from).join(o.to))) } }); }
+      else if (o.op === 'moveEmp') {
+        const e = cur().emps.find((x) => x[1] === o.name); if (!e || e[2] === o.to || !jobOf(o.to)) continue;
+        const from = e[2], fd = (jobOf(from) || {}).dept; putEmp([e[0], e[1], o.to, e[3], e[4], e[5], e[6]]);
+        const pf = { ...((ed.profiles || {})[e[0]] || {}) }; pf.history = [...(pf.history || []), { d: now(), t: 'move', from, to: o.to, fd, td: jobOf(o.to).dept, by: m.by }].slice(-50);
+        ed.profiles = { ...(ed.profiles || {}), [e[0]]: pf };
+      } else if (o.op === 'empRep') for (const e of cur().emps) { if (o.codes.includes(e[2])) putEmp([e[0], e[1], e[2], e[3], e[4], o.rep, o.rep_ar]); }
+      else if (o.op === 'deptHead') { const d = cur().depts.find((x) => x.no === o.no); if (d) ed.depts = { ...(ed.depts || {}), [String(o.no)]: { ...d, head: o.head, head_ar: o.head_ar } }; }
+    }
+    ed.applied.push(m.id);
+  }
+  return ed;
 }
 function decrypt(pass) {
   const key = crypto.scryptSync(String(pass), Buffer.from(ENC.salt, 'base64'), 32, { N: 16384, r: 8, p: 1 });

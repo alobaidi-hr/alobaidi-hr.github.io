@@ -1,0 +1,298 @@
+[
+ {
+  "id": "2026-10-14-crm-supervisor",
+  "by": "aws.firas@alobaidi-cars.com",
+  "ops": [
+   {
+    "op": "addJob",
+    "job": {
+     "code": "LO-CRM-03",
+     "dept": 12,
+     "en": "CRM Supervisor",
+     "ar": "مشرف علاقات العملاء",
+     "b": {
+      "purpose": [
+       "Lead and supervise the CRM team across all branches to deliver a consistent, high-quality customer experience throughout the ownership lifecycle — from lead handling and post-sale follow-up to after-sales service and retention — while ensuring accurate customer data, timely complaint resolution and measurable improvement in satisfaction and loyalty.",
+       "قيادة فريق علاقات العملاء والإشراف عليه في جميع الفروع لتقديم تجربة عملاء متسقة وعالية الجودة طوال دورة الملكية — من استقبال العملاء المحتملين والمتابعة بعد البيع إلى خدمات ما بعد البيع والاحتفاظ بالعملاء — مع ضمان دقة بيانات العملاء وسرعة معالجة الشكاوى وتحقيق تحسّن قابل للقياس في الرضا والولاء."
+      ],
+      "duties": [
+       [
+        "Plan, assign and supervise the daily work of CRM Executives and Receptionists in Baghdad, Erbil and Mosul, and balance workload across the team.",
+        "تخطيط العمل اليومي لموظفي علاقات العملاء وموظفي الاستقبال في بغداد وأربيل والموصل وتوزيعه والإشراف عليه، وموازنة عبء العمل بين أعضاء الفريق."
+       ],
+       [
+        "Own the customer contact programme: post-sale, post-service and delivery follow-up calls, ensuring every customer is contacted within the agreed time.",
+        "الإشراف على برنامج التواصل مع العملاء: مكالمات المتابعة بعد البيع وبعد الخدمة وبعد التسليم، وضمان التواصل مع كل عميل خلال المدة المعتمدة."
+       ],
+       [
+        "Manage the complaint process end to end: logging, routing to the responsible department, escalation, closure and confirming the customer's satisfaction with the outcome.",
+        "إدارة دورة الشكاوى كاملة: التسجيل والتحويل للقسم المسؤول والتصعيد والإغلاق والتأكد من رضا العميل عن النتيجة."
+       ],
+       [
+        "Personally handle escalated and sensitive customer cases and agree corrective actions with Sales, Service and Spare Parts managers.",
+        "التعامل شخصياً مع حالات العملاء المصعّدة والحساسة، والاتفاق على الإجراءات التصحيحية مع مدراء المبيعات والخدمة وقطع الغيار."
+       ],
+       [
+        "Monitor lead distribution to the sales team, response times and lead follow-up, and report delays and lost opportunities.",
+        "مراقبة توزيع العملاء المحتملين على فريق المبيعات وأزمنة الاستجابة ومتابعة العملاء المحتملين، والإبلاغ عن التأخير والفرص الضائعة."
+       ],
+       [
+        "Plan and execute retention and loyalty campaigns (service reminders, warranty and renewal reminders, customer occasions) and measure their conversion.",
+        "تخطيط وتنفيذ حملات الاحتفاظ بالعملاء والولاء (تذكيرات الصيانة والضمان والتجديد ومناسبات العملاء) وقياس نسب التحويل."
+       ],
+       [
+        "Govern CRM data quality: completeness, accuracy and duplicate control, and run monthly data audits.",
+        "حوكمة جودة بيانات CRM: الاكتمال والدقة ومنع التكرار، وإجراء تدقيق شهري على البيانات."
+       ],
+       [
+        "Run call quality monitoring: listen to and score a monthly sample of calls per employee and give structured coaching.",
+        "متابعة جودة المكالمات: الاستماع لعيّنة شهرية من مكالمات كل موظف وتقييمها وتقديم التوجيه المنظّم."
+       ],
+       [
+        "Prepare the monthly Customer Experience report (CSI, complaints, root causes, retention, lead response) with improvement recommendations for the Head of Marketing & CX.",
+        "إعداد تقرير تجربة العملاء الشهري (رضا العملاء والشكاوى وأسبابها الجذرية والاحتفاظ والاستجابة للعملاء المحتملين) مع توصيات التحسين لمدير التسويق وتجربة العملاء."
+       ],
+       [
+        "Maintain and update CRM scripts, standard responses and procedures, and train new team members on them.",
+        "إعداد نصوص المكالمات والردود القياسية وإجراءات العمل وتحديثها، وتدريب الموظفين الجدد عليها."
+       ],
+       [
+        "Evaluate team performance against KPIs, conduct periodic appraisals and propose training needs.",
+        "تقييم أداء الفريق مقابل مؤشرات الأداء وإجراء التقييمات الدورية واقتراح الاحتياجات التدريبية."
+       ],
+       [
+        "Protect customer data confidentiality and ensure compliance with company policies on customer communication.",
+        "حماية سرية بيانات العملاء وضمان الالتزام بسياسات الشركة الخاصة بالتواصل مع العملاء."
+       ]
+      ],
+      "kpis": [
+       {
+        "en": "Customer Satisfaction Index (CSI) — all branches",
+        "ar": "مؤشر رضا العملاء (CSI) — جميع الفروع",
+        "t_en": "≥ 88%",
+        "t_ar": "≥ 88%",
+        "m_en": "Post-sale and post-service survey results",
+        "m_ar": "نتائج استبيانات ما بعد البيع وما بعد الخدمة",
+        "f_en": "Monthly",
+        "f_ar": "شهري",
+        "w": 20
+       },
+       {
+        "en": "Complaints Resolved within SLA (48 hours)",
+        "ar": "الشكاوى المعالَجة ضمن المدة المعتمدة (48 ساعة)",
+        "t_en": "≥ 95%",
+        "t_ar": "≥ 95%",
+        "m_en": "Complaint tracker in CRM",
+        "m_ar": "سجل متابعة الشكاوى في CRM",
+        "f_en": "Monthly",
+        "f_ar": "شهري",
+        "w": 15
+       },
+       {
+        "en": "Follow-up Contact Coverage (post-sale / post-service)",
+        "ar": "تغطية مكالمات المتابعة (بعد البيع / بعد الخدمة)",
+        "t_en": "100% within 3 days",
+        "t_ar": "100% خلال 3 أيام",
+        "m_en": "CRM call log vs. delivery and job-card reports",
+        "m_ar": "سجل المكالمات في CRM مقابل تقارير التسليم وأوامر العمل",
+        "f_en": "Monthly",
+        "f_ar": "شهري",
+        "w": 15
+       },
+       {
+        "en": "Lead Handling — assigned within 2 working hours and followed up",
+        "ar": "معالجة العملاء المحتملين — توزيع خلال ساعتي عمل ومتابعة",
+        "t_en": "≥ 95%",
+        "t_ar": "≥ 95%",
+        "m_en": "CRM lead report (time to assign / follow-up status)",
+        "m_ar": "تقرير العملاء المحتملين في CRM (زمن التوزيع / حالة المتابعة)",
+        "f_en": "Monthly",
+        "f_ar": "شهري",
+        "w": 15
+       },
+       {
+        "en": "Service Retention — reminder-to-booking conversion",
+        "ar": "الاحتفاظ بعملاء الخدمة — تحويل التذكيرات إلى حجوزات",
+        "t_en": "≥ 35%",
+        "t_ar": "≥ 35%",
+        "m_en": "Reminder log vs. workshop bookings",
+        "m_ar": "سجل التذكيرات مقابل حجوزات الورشة",
+        "f_en": "Monthly",
+        "f_ar": "شهري",
+        "w": 10
+       },
+       {
+        "en": "CRM Data Quality (complete, accurate, no duplicates)",
+        "ar": "جودة بيانات CRM (مكتملة ودقيقة وبدون تكرار)",
+        "t_en": "≥ 98%",
+        "t_ar": "≥ 98%",
+        "m_en": "Monthly data audit sample",
+        "m_ar": "عيّنة التدقيق الشهري للبيانات",
+        "f_en": "Monthly",
+        "f_ar": "شهري",
+        "w": 10
+       },
+       {
+        "en": "Call Quality Score of the team",
+        "ar": "درجة جودة المكالمات للفريق",
+        "t_en": "≥ 90%",
+        "t_ar": "≥ 90%",
+        "m_en": "Call monitoring scorecards",
+        "m_ar": "نماذج تقييم المكالمات المسجّلة",
+        "f_en": "Monthly",
+        "f_ar": "شهري",
+        "w": 10
+       },
+       {
+        "en": "Customer Experience Report delivered on time",
+        "ar": "تسليم تقرير تجربة العملاء في موعده",
+        "t_en": "By the 5th of each month",
+        "t_ar": "قبل اليوم 5 من كل شهر",
+        "m_en": "Report submission date",
+        "m_ar": "تاريخ تسليم التقرير",
+        "f_en": "Monthly",
+        "f_ar": "شهري",
+        "w": 5
+       }
+      ],
+      "qual": {
+       "Education": [
+        "Bachelor's degree in Business Administration, Marketing or a related field.",
+        "بكالوريوس في إدارة الأعمال أو التسويق أو مجال ذي صلة."
+       ],
+       "Experience": [
+        "4–6 years in customer service, call centre or CRM, including at least 1–2 years leading a team; automotive or retail experience preferred.",
+        "من 4 إلى 6 سنوات في خدمة العملاء أو مراكز الاتصال أو إدارة علاقات العملاء، منها سنة إلى سنتان على الأقل في قيادة فريق، ويفضّل خبرة في قطاع السيارات أو التجزئة."
+       ],
+       "Languages": [
+        "Arabic (native), English (good); Kurdish is an advantage for Erbil.",
+        "العربية (لغة أم)، الإنجليزية (جيد)، والكردية ميزة إضافية لفرع أربيل."
+       ]
+      },
+      "tech": [
+       [
+        "CRM system administration, reporting and data governance",
+        "إدارة نظام CRM وتقاريره وحوكمة بياناته"
+       ],
+       [
+        "Customer satisfaction measurement (CSI / NPS)",
+        "قياس رضا العملاء (CSI / NPS)"
+       ],
+       [
+        "Complaint management and root-cause analysis",
+        "إدارة الشكاوى وتحليل الأسباب الجذرية"
+       ],
+       [
+        "Call quality monitoring and coaching",
+        "مراقبة جودة المكالمات والتوجيه"
+       ],
+       [
+        "Lead management and sales follow-up tracking",
+        "إدارة العملاء المحتملين ومتابعة المبيعات"
+       ],
+       [
+        "Retention and loyalty campaign planning",
+        "تخطيط حملات الاحتفاظ والولاء"
+       ],
+       [
+        "Advanced Excel and dashboard reporting",
+        "Excel المتقدم وإعداد لوحات المؤشرات"
+       ]
+      ],
+      "beh": [
+       [
+        "Team leadership and coaching",
+        "قيادة الفريق والتوجيه"
+       ],
+       [
+        "Customer-first mindset",
+        "التركيز على العميل أولاً"
+       ],
+       [
+        "Calm handling of escalations",
+        "الهدوء في التعامل مع الحالات المصعّدة"
+       ],
+       [
+        "Analytical thinking and attention to detail",
+        "التفكير التحليلي والدقة"
+       ],
+       [
+        "Cross-department coordination",
+        "التنسيق بين الأقسام"
+       ],
+       [
+        "Accountability and follow-through",
+        "تحمّل المسؤولية والمتابعة حتى الإنجاز"
+       ],
+       [
+        "Confidentiality and integrity",
+        "الكتمان والنزاهة"
+       ]
+      ],
+      "ov": {
+       "Reports To": [
+        "Ratib Rifat Abdo — Head of Marketing & CX",
+        "Ratib Rifat Abdo — مدير التسويق وتجربة العملاء"
+       ],
+       "Grade": [
+        "Level 3 — Supervisor / المستوى 3 — إشرافي"
+       ],
+       "Branches": [
+        "Baghdad (oversight of Erbil · Mosul) / بغداد (مع الإشراف على أربيل · الموصل)"
+       ],
+       "Headcount": [
+        "1"
+       ],
+       "Employment Type": [
+        "Full-time / دوام كامل"
+       ]
+      }
+     }
+    }
+   },
+   {
+    "op": "jobReportsTo",
+    "codes": [
+     "LO-CRM-01",
+     "LO-CRM-02"
+    ],
+    "value": [
+     "Shahad Ahmed Wadi — CRM Supervisor",
+     "Shahad Ahmed Wadi — مشرف علاقات العملاء"
+    ]
+   },
+   {
+    "op": "jobText",
+    "code": "LO-CRM-01",
+    "from": "for the Head of Marketing & CX",
+    "to": "for the CRM Supervisor"
+   },
+   {
+    "op": "jobText",
+    "code": "LO-CRM-01",
+    "from": "لمدير التسويق وتجربة العملاء",
+    "to": "لمشرف علاقات العملاء"
+   },
+   {
+    "op": "moveEmp",
+    "name": "Shahad Ahmed Wadi",
+    "to": "LO-CRM-03"
+   },
+   {
+    "op": "empRep",
+    "codes": [
+     "LO-CRM-01",
+     "LO-CRM-02"
+    ],
+    "rep": "Shahad Ahmed Wadi (CRM Supervisor)",
+    "rep_ar": "Shahad Ahmed Wadi (مشرف علاقات العملاء)"
+   },
+   {
+    "op": "deptHead",
+    "no": 12,
+    "head": "Shahad Ahmed Wadi — CRM Supervisor",
+    "head_ar": "Shahad Ahmed Wadi — مشرف علاقات العملاء"
+   }
+  ]
+ }
+]
