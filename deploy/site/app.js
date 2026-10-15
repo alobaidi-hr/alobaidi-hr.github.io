@@ -1039,6 +1039,19 @@ VIEWS.activity = function (v) {
 };
 
 /* ----- admin: settings */
+/* ERP link: export job descriptions + KPIs as one JSON file the L-O ERP imports (format lo-hr.jd-kpi) */
+function erpCard() {
+  return '<div class="card"><div class="hd"><h2>الربط مع نظام الـ ERP</h2><span class="en">ERP link · Job descriptions &amp; KPIs</span></div><div class="bd stack">' +
+    '<div class="muted" style="font-size:12.5px">يصدّر كل الأوصاف الوظيفية ومؤشرات الأداء (' + S.data.jobs.length + ' وصفاً) بملف واحد يُستورد في الـ ERP من صفحة «الأوصاف ومؤشرات الأداء» ← «استيراد ملف الأوصاف». الربط بين النظامين برمز الوظيفة، والملف لا يحتوي بيانات الموظفين.</div>' +
+    '<button class="btn pri" id="erpx" style="width:max-content">' + ic('dl') + 'تصدير ملف الأوصاف والمؤشرات للـ ERP</button></div></div>';
+}
+function exportERP() {
+  var pick = function (j) { return { code: j.code, dept: j.dept, en: j.en, ar: j.ar, b: j.b }; };
+  var file = { format: 'lo-hr.jd-kpi', version: 1, exportedAt: nowBaghdad(), source: location.href.split('#')[0].replace(/\?.*$/, ''),
+    departments: S.data.depts.map(function (d) { return { no: d.no, en: d.en, ar: d.ar }; }), jobs: S.data.jobs.map(pick) };
+  saveBlob(new Blob([JSON.stringify(file, null, 1)], { type: 'application/json' }), 'L-O_JD_KPI_for_ERP_' + nowBaghdad().slice(0, 10) + '.json');
+  toast('تم تصدير ' + file.jobs.length + ' وصفاً وظيفياً');
+}
 VIEWS.settings = function (v) {
   var s = S.data.settings;
   v.innerHTML = head('الإعدادات', 'هوية الشركة والشعار، الأقسام، الشركات والبراندات، ومعايير التقييم — صلاحيات المستخدمين من صفحة «المستخدمون والأقسام»', '', '<a class="btn sec" href="#/users">' + ic('users') + 'المستخدمون والصلاحيات</a>') +
@@ -1051,7 +1064,8 @@ VIEWS.settings = function (v) {
     '<div class="actions"><button class="btn pri" id="ss">حفظ الإعدادات</button></div><div class="msg" id="sm"></div></div></div>' +
     '<div class="card"><div class="hd"><h2>الشعار</h2></div><div class="bd stack"><div style="display:flex;gap:16px;align-items:center"><img id="lg" src="' + esc(shieldSrc()) + '" alt="" style="height:90px;background:var(--surface2);border-radius:8px;padding:6px"><div class="muted" style="font-size:12.5px">الشعار الحالي لشركة الليث العبيدي مدمج في النظام. يمكنك استبداله بصورة أخرى (PNG بخلفية شفافة).</div></div>' +
     '<label class="btn sec" style="width:max-content">اختيار صورة<input type="file" id="lf" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden></label><button class="btn sec sm" id="lr" style="width:max-content">إرجاع الشعار الأصلي</button></div></div></div>' +
-    '<div class="stack" style="margin-top:16px">' + deptsCard() + orgsCard() + critCard() + '</div>';
+    '<div class="stack" style="margin-top:16px">' + erpCard() + deptsCard() + orgsCard() + critCard() + '</div>';
+  var xb = $('#erpx'); if (xb) xb.onclick = exportERP;
   var logo = s.logo || '';
   $('#lf').onchange = function () {
     var f = this.files[0]; if (!f) return;
