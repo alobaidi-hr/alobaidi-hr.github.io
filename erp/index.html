@@ -51,7 +51,7 @@
     var frame = document.createElement('iframe');
     frame.title = 'نظام ERP';
     frame.src = target;
-    frame.allow = 'clipboard-write';
+    frame.allow = 'clipboard-write; geolocation';
     // Fallback: a direct link if the frame cannot load (old browser, blocked frame).
     var link = document.createElement('a');
     link.className = 'go'; link.href = target; link.textContent = 'فتح النظام';
