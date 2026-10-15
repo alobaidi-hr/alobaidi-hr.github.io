@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>L-O ERP — شركة الليث العبيدي</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="shield.png">
+<style>
+  :root { --ink:#1D1B1F; --brand:#E15532; --muted:#6B6461; --paper:#fff; --canvas:#F6F3F1; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; display:grid; place-items:center; padding:24px 16px; background:
+    radial-gradient(900px 480px at 85% -10%, rgba(225,85,50,.16), transparent 60%), var(--canvas);
+    color:var(--ink); font:15px/1.7 Tahoma, "Segoe UI", sans-serif; }
+  main { width:min(100%, 460px); padding:34px 28px; border:1px solid #E7E1DE; border-radius:14px; background:var(--paper);
+    text-align:center; box-shadow:0 14px 34px rgba(29,27,31,.08); }
+  img { height:72px; }
+  h1 { margin:14px 0 4px; font-size:20px; }
+  p { margin:6px 0; color:var(--muted); font-size:13px; }
+  .go { display:inline-flex; align-items:center; justify-content:center; gap:8px; margin-top:20px; min-height:44px; padding:0 22px;
+    border-radius:8px; background:var(--brand); color:#fff; font-weight:700; text-decoration:none; }
+  .go:hover { background:#C2421F; }
+  .links { margin-top:22px; padding-top:16px; border-top:1px solid #F0EBE8; font-size:13px; }
+  .links a { color:#C2421F; }
+  .pending { margin-top:18px; padding:12px; border-radius:8px; background:#FDEEE8; color:#A23517; font-size:13px; }
+</style>
+</head>
+<body>
+<main>
+  <img src="shield.png" alt="">
+  <h1>نظام إدارة الموارد والرواتب</h1>
+  <p>شركة الليث العبيدي — الموظفون، الحضور، الإجازات، الرواتب، والمالية مع SAP</p>
+  <div id="state"></div>
+  <div class="links">نظام الأوصاف الوظيفية ومؤشرات الأداء: <a href="../">alobaidi-hr.github.io</a></div>
+</main>
+<script src="config.js"></script>
+<script>
+  (function () {
+    var url = (window.LO_ERP && window.LO_ERP.url || '').replace(/\/+$/, '');
+    var state = document.getElementById('state');
+    if (!/^https:\/\//.test(url)) {
+      state.innerHTML = '<div class="pending">النظام قيد التنصيب على سيرفر الشركة. سيعمل هذا الرابط فور جاهزيته.</div>';
+      return;
+    }
+    var target = url + '/' + (location.hash || '');
+    var link = document.createElement('a');
+    link.className = 'go'; link.href = target; link.textContent = 'الدخول إلى النظام';
+    state.appendChild(link);
+    var note = document.createElement('p'); note.textContent = 'جارٍ تحويلك…'; state.appendChild(note);
+    setTimeout(function () { location.replace(target); }, 600);
+  })();
+</script>
+</body>
+</html>
