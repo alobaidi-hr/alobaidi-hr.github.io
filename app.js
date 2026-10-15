@@ -51,6 +51,7 @@ function periods(type) {
 }
 var ICON = {
   home: 'M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z',
+  erp: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z',
   jd: 'M6 3h9l5 5v13H6zM14 3v6h6M9 13h8M9 17h8',
   kpi: 'M4 20V10M10 20V4M16 20v-7M22 20H2',
   emp: 'M16 19v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1M9.5 10a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7M21 19v-1a4 4 0 0 0-3-3.9M16 3.2a3.5 3.5 0 0 1 0 6.6',
@@ -217,7 +218,7 @@ function renderSetPassword(st, name) {
 
 /* ---------------------------------------------------------------- shell */
 var NAV = [
-  ['', [['home', 'home', 'الرئيسية']]],
+  ['', [['home', 'home', 'الرئيسية'], ['erp', 'erp', 'نظام ERP', 'erp/']]],
   ['المرجع الوظيفي', [['jd', 'jd', 'الأوصاف الوظيفية'], ['kpi', 'kpi', 'مكتبة المؤشرات'], ['emp', 'emp', 'الموظفون'], ['gov', 'gov', 'مصفوفة الصلاحيات']]],
   ['تقييم الأداء', [['box', 'inbox', 'الوارد'], ['eval', 'eval', 'تقييم موظف'], ['self', 'selfi', 'التقييم الذاتي'], ['mine', 'mine', 'تقييماتي'], ['approvals', 'check', 'الاعتمادات']]],
   ['الإدارة', [['inbox', 'inbox', 'صندوق النتائج'], ['archive', 'archive', 'الأرشيف الشامل'], ['trash', 'trash', 'سلة المحذوفات'], ['users', 'users', 'المستخدمون والأقسام'], ['activity', 'act', 'سجل الدخول والزيارات'], ['law', 'law', 'الامتثال القانوني'], ['settings', 'set', 'الإعدادات']], true]
@@ -226,7 +227,7 @@ function renderShell() {
   var u = S.user, b = S.brand || {};
   var nav = NAV.filter(function (g) { return !g[2] || isAdmin(); }).map(function (g) {
     return (g[0] ? '<div class="grp">' + g[0] + '</div>' : '') + g[1].filter(function (n) { return !(/^(gm|ceo)$/.test(role()) && /^(eval|self|mine)$/.test(n[0])) && !(n[0] === 'box' && isAdmin()); }).map(function (n) {
-      return '<a class="nav" href="#/' + n[0] + '" data-r="' + n[0] + '">' + ic(n[1]) + '<span>' + n[2] + '</span>' + (n[0] === 'inbox' ? '<span class="badge" id="unread"' + (S.unread ? '' : ' hidden') + '>' + S.unread + '</span>' : '') + (n[0] === 'box' ? '<span class="badge" id="boxc"' + (S.boxUnread ? '' : ' hidden') + '>' + (S.boxUnread || 0) + '</span>' : '') + (n[0] === 'mine' ? '<span class="badge" id="minec">' + S.evals.length + '</span>' : '') + '</a>';
+      return '<a class="nav" href="' + (n[3] || '#/' + n[0]) + '" data-r="' + n[0] + '">' + ic(n[1]) + '<span>' + n[2] + '</span>' + (n[0] === 'inbox' ? '<span class="badge" id="unread"' + (S.unread ? '' : ' hidden') + '>' + S.unread + '</span>' : '') + (n[0] === 'box' ? '<span class="badge" id="boxc"' + (S.boxUnread ? '' : ' hidden') + '>' + (S.boxUnread || 0) + '</span>' : '') + (n[0] === 'mine' ? '<span class="badge" id="minec">' + S.evals.length + '</span>' : '') + '</a>';
     }).join('');
   }).join('');
   $('#app').innerHTML =
