@@ -1,6 +1,5 @@
 /*
- * عنوان نظام ERP على سيرفر الشركة (Hostinger VPS).
- * بعد تنصيب السيرفر ضع الرابط هنا، مثال: 'https://srv123456.hstgr.cloud'
- * Address of the ERP on the company server; leave empty until it is installed.
+ * عنوان نظام ERP على سيرفر الشركة. صفحة /erp تحوّل إليه مباشرة.
+ * Address of the ERP; the /erp page forwards to it.
  */
-window.LO_ERP = { url: 'https://srv2064757.hstgr.cloud' };
+window.LO_ERP = { url: 'https://erp.g-n-group.com' };
