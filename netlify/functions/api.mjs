@@ -100,13 +100,13 @@ function cleanPurpose(p) {
   p = p || {}; const s = (v, n) => String(v == null ? '' : v).trim().slice(0, n), num = (v) => { const x = Number(v); return Number.isFinite(x) && x >= 0 ? Math.round(x * 100) / 100 : null; };
   const k = PURPOSES.includes(p.k) ? p.k : 'periodic';
   const o = { k, why: s(p.why, 1500) };
-  if (k === 'raise' || k === 'promo_raise') { o.mode = p.mode === 'amt' ? 'amt' : 'pct'; o.val = num(p.val); if (o.mode === 'pct' && o.val > 100) err('invalid', 'نسبة الزيادة غير منطقية'); }
+  if (k === 'raise' || k === 'promo_raise') { o.mode = ['pct', 'iqd', 'usd', 'amt'].includes(p.mode) ? p.mode : 'pct'; o.val = num(p.val); if (o.mode === 'pct' && o.val > 100) err('invalid', 'نسبة الزيادة غير منطقية'); }
   if (k === 'promo' || k === 'promo_raise' || k === 'move') { o.job = s(p.job, 20); o.txt = s(p.txt, 150); }
   if (k !== 'periodic') o.date = s(p.date, 10);
   return o;
 }
 const cleanSig = (x) => (typeof x === 'string' && /^data:image\/(png|jpeg|webp);base64,/.test(x) && x.length < 90000 ? x : '');
-const WF_NAMES = { employee: 'بانتظار توقيع الموظف', hr: 'مراجعة الموارد البشرية', gm: 'عند المدير العام', ceo: 'عند الرئيس التنفيذي', returned: 'مُعاد للمقيّم', done: 'معتمد نهائياً' };
+const WF_NAMES = { employee: 'بانتظار توقيع الموظف', hr: 'مراجعة الموارد البشرية', gm: 'عند المدير العام', ceo: 'عند الرئيس التنفيذي', returned: 'مُعاد للمقيّم', done: 'معتمد نهائياً', cancelled: 'ملغاة' };
 const PROFILE_KEYS = ['phone', 'email', 'hire', 'birth', 'company', 'brand', 'grade', 'contract', 'nat', 'address', 'notes'];
 const empDept = (e) => (JOBS[e[2]] ? JOBS[e[2]].dept : 0);
 
@@ -120,11 +120,11 @@ async function users() {
 }
 const hash = (pw, salt) => crypto.pbkdf2Sync(String(pw), salt, 120000, 32, 'sha256').toString('base64');
 const randCode = () => crypto.randomBytes(3).toString('hex').toUpperCase();
-const ROLES = ['admin', 'manager', 'gm', 'ceo'];
+const ROLES = ['admin', 'manager', 'gm', 'ceo', 'auditor'];
 const roleOf = (u) => (ROLES.includes(u.role) ? u.role : 'manager');
-const deptList = (u) => (roleOf(u) === 'manager' ? (u.depts || []).map(Number) : 'ALL');
+const deptList = (u) => (roleOf(u) === 'manager' ? (u.depts || []).map(Number) : roleOf(u) === 'auditor' ? [] : 'ALL');
 const permsOf = (u) => (u.role === 'admin' ? { jd: true, emp: true } : { jd: !!(u.perms && u.perms.jd), emp: !!(u.perms && u.perms.emp) });
-const publicUser = (email, u) => ({ email, name: u.name, title: u.title || '', role: roleOf(u), depts: deptList(u), allJD: roleOf(u) !== 'manager' || !!u.allJD, perms: permsOf(u), sig: u.sig || '' });
+const publicUser = (email, u) => ({ email, name: u.name, title: u.title || '', role: roleOf(u), depts: deptList(u), allJD: roleOf(u) !== 'manager' || !!u.allJD, perms: permsOf(u), sig: u.sig || '', owner: isOwner(u), grants: grantsOf(u), cap: capOf(u), scope: u.role === 'auditor' ? (u.scope || { companies: [], branches: [] }) : null });
 /* admin, or a manager given the edit permission — limited to his own departments */
 async function editor(token, kind, depts) {
   const a = await auth(token), pu = publicUser(a.email, a.u); if (pu.role === 'admin') return a;
@@ -179,7 +179,7 @@ const score = (v, allowNull) => {
   if ((v === null || v === undefined || v === '') && allowNull) return null;
   const n = Number(v); if (!(n >= 0 && n <= 10) || Math.round(n) !== n) err('invalid', 'درجة غير صالحة'); return n;
 };
-async function evals() { return getJSON('evals', {}); }
+async function evals() { await migrateV3(); return getJSON('evals', {}); }
 /* incoming box for managers / GM / CEO: evaluations and self-assessments that reach them */
 async function boxItems(email, u) {
   const role = roleOf(u), pu = publicUser(email, u), inD = (d) => pu.depts === 'ALL' || pu.depts.includes(Number(d)), out = [];
@@ -200,6 +200,188 @@ async function boxItems(email, u) {
   for (const i of out) i.unread = !seen[i.key] || seen[i.key] < i.at;
   return out.sort((a, b) => (Number(b.act) - Number(a.act)) || (a.at < b.at ? 1 : -1));
 }
+
+/* ================= v3: versions, raise, recall / cancel / HR edit, official approvals register ================= */
+const GRANTS = ['recall', 'cancel', 'edit', 'exec'];
+const isOwner = (u) => u.role === 'admin' && !!u.owner;
+const grantsOf = (u) => { const g = {}; for (const k of GRANTS) g[k] = isOwner(u) || (u.role === 'admin' && !!(u.grants && u.grants[k])); return g; };
+const capOf = (u) => (isOwner(u) ? 'owner' : u.role === 'admin' ? 'hr' : u.role === 'manager' ? 'evaluator' : u.role);
+const CAP_NAMES = { owner: 'مالك النظام', hr: 'الموارد البشرية', evaluator: 'المقيّم', gm: 'المدير العام', ceo: 'الرئيس التنفيذي', auditor: 'المدقق الداخلي', employee: 'الموظف' };
+const sha = (o) => crypto.createHash('sha256').update(JSON.stringify(o)).digest('hex');
+const needGrant = (u, k) => { if (!grantsOf(u)[k]) err('forbidden', 'ليست لديك صلاحية هذا الإجراء (تُمنح من مالك النظام)'); };
+const needReason = (s, min = 5) => { s = String(s || '').trim().slice(0, 1500); if (s.length < min) err('invalid', 'السبب إلزامي'); return s; };
+
+/* exchange rate: IQD per 1 USD, set by HR; a raise stores the rate it was computed with */
+const rnd = (x, d) => { const f = 10 ** d; return Math.round((Number(x) + Number.EPSILON) * f) / f; };
+const curRound = (cur, x) => rnd(x, cur === 'USD' ? 2 : 0);
+function computeRaise(p, fx) {
+  const cur = p.cur === 'USD' ? 'USD' : 'IQD', mode = ['pct', 'iqd', 'usd'].includes(p.mode) ? p.mode : 'pct';
+  const base = Number(p.base), val = Number(p.val), rate = Number(fx && fx.rate);
+  if (!(base > 0) || base > 1e10) err('invalid', 'اكتب الراتب الأساسي الحالي');
+  if (!(val > 0) || val > 1e10) err('invalid', 'اكتب قيمة الزيادة (نسبة أو مبلغ)');
+  if (mode === 'pct' && val > 100) err('invalid', 'نسبة الزيادة غير منطقية');
+  if (!(rate > 0)) err('rate_required', 'سعر صرف الدولار غير محدد في النظام. يحدده مدير الموارد البشرية من الإعدادات أولاً.');
+  const b = curRound(cur, base);
+  let inc;
+  if (mode === 'pct') inc = curRound(cur, b * rnd(val, 2) / 100);
+  else if ((mode === 'iqd' && cur === 'IQD') || (mode === 'usd' && cur === 'USD')) inc = curRound(cur, val);
+  else if (mode === 'iqd') inc = rnd(rnd(val, 0) / rate, 2);
+  else inc = rnd(rnd(val, 2) * rate, 0);
+  if (!(inc > 0)) err('invalid', 'الزيادة بعد التقريب تساوي صفراً');
+  return { base: b, cur, mode, val: mode === 'iqd' ? rnd(val, 0) : rnd(val, 2), rate, rateDate: fx.date || '', inc,
+    pct: mode === 'pct' ? rnd(val, 2) : rnd(inc / b * 100, 2),
+    iqd: mode === 'iqd' ? rnd(val, 0) : cur === 'IQD' ? inc : rnd(inc * rate, 0),
+    usd: mode === 'usd' ? rnd(val, 2) : cur === 'USD' ? inc : rnd(inc / rate, 2),
+    newBase: curRound(cur, b + inc) };
+}
+const isRaise = (k) => k === 'raise' || k === 'promo_raise';
+const isPromo = (k) => k === 'promo' || k === 'promo_raise' || k === 'move';
+/* purpose with raise / promotion; the server always recomputes the amounts */
+function buildPurpose(p, e, fx, keep) {
+  p = p || {}; const o = cleanPurpose(p), s = (v, n) => String(v == null ? '' : v).trim().slice(0, n);
+  if (o.k !== 'periodic') { if (!/^\d{4}-\d{2}-\d{2}$/.test(o.date || '')) err('invalid', 'حدد تاريخ النفاذ'); }
+  if (isRaise(o.k)) {
+    o.mode = ['pct', 'iqd', 'usd'].includes(p.mode) ? p.mode : 'pct'; o.cur = p.cur === 'USD' ? 'USD' : 'IQD';
+    const fxOk = (keep && keep.rate) || (fx && fx.rate);
+    if (p.allowIncomplete && (!(Number(p.base) > 0) || !fxOk)) {
+      if (!(Number(p.val) > 0)) err('invalid', 'اكتب قيمة الزيادة (نسبة أو مبلغ)');
+      o.val = Number(p.val); o.base = Number(p.base) > 0 ? Number(p.base) : null; o.incomplete = !fxOk ? 'rate' : 'base';
+    } else {
+    const rate = keep && keep.rate && !p.refreshRate ? { rate: keep.rate, date: keep.rateDate } : fx;
+    Object.assign(o, computeRaise({ base: p.base, cur: p.cur, mode: p.mode, val: p.val }, rate));
+    }
+  }
+  if (isPromo(o.k) || isRaise(o.k)) {
+    const pf = (SEED.profiles || {})[e[0]] || {};
+    o.jobFrom = e[2]; o.titleFrom = (JOBS[e[2]] && (JOBS[e[2]].ar || JOBS[e[2]].en)) || '';
+    o.gradeFrom = s(p.gradeFrom != null && p.gradeFrom !== '' ? p.gradeFrom : pf.grade, 40);
+    if (isPromo(o.k)) { if (o.job && !JOBS[o.job]) err('invalid', 'الوظيفة الجديدة غير معرّفة'); o.titleTo = o.job ? (JOBS[o.job].ar || JOBS[o.job].en) : o.txt; o.gradeTo = s(p.gradeTo, 40); if (!o.titleTo && !o.gradeTo) err('invalid', 'حدد المسمى أو الدرجة بعد الترقية/النقل'); }
+  }
+  return o;
+}
+
+function calcWith(kpis, cw, a, b, type) {
+  let sw = 0, ss = 0, anyLow = false, allHi = true;
+  kpis.forEach((k, i) => { const v = a[i]; if (v !== null && v !== undefined) { sw += k.w; ss += k.w * v; if (v < 5) anyLow = true; if (v < 6) allHi = false; } });
+  let bw = 0, bs = 0; cw.forEach((c, i) => { bw += c[2]; bs += c[2] * b[i]; });
+  const r1 = (x) => Math.round(x * 10) / 10;
+  const A = ss / sw * 10, B = bs / bw * 10, F = r1(0.6 * A + 0.4 * B), rc = [];
+  if (F >= 85 && allHi) rc.push('PROMO');
+  if (type === 'probation') rc.push(F >= 70 ? 'CONF' : 'EXT');
+  if (F < 70 || anyLow) rc.push('DEV');
+  if (F < 65) rc.push('PIP');
+  if (F < 55) rc.push('TERM');
+  if (!rc.length) rc.push('KEEP');
+  return { A: r1(A), B: r1(B), F, r: F >= 85 ? 3 : F >= 70 ? 2 : F >= 55 ? 1 : 0, rc };
+}
+const CONTENT = ['type', 'period', 'emp', 'a', 'b', 'A', 'B', 'F', 'r', 'rc', 'n', 'pp', 'rcs', 'k', 'cw', 'ev'];
+const snapOf = (r) => JSON.parse(JSON.stringify(Object.fromEntries(CONTENT.map((k) => [k, r[k] === undefined ? null : r[k]]))));
+const NOTE_NAMES = { s: 'نقاط القوة', d: 'مجالات التحسين', t: 'الاحتياجات التدريبية', g: 'أهداف الفترة القادمة', e: 'ملاحظات الموظف' };
+const PP_NAMES = { k: 'الغرض', why: 'المبرر', base: 'الراتب الأساسي الحالي', cur: 'عملة الراتب', mode: 'أساس الزيادة', val: 'قيمة الأساس', rate: 'سعر الصرف', inc: 'الزيادة بعملة الراتب', pct: 'نسبة الزيادة', iqd: 'الزيادة بالدينار', usd: 'الزيادة بالدولار', newBase: 'الراتب الأساسي الجديد', date: 'تاريخ النفاذ', job: 'الوظيفة الجديدة', txt: 'المسمى الجديد', titleTo: 'المسمى بعد', gradeFrom: 'الدرجة قبل', gradeTo: 'الدرجة بعد' };
+/* field-by-field differences between two snapshots, with readable labels */
+function diffSnap(o, n) {
+  const out = [], add = (f, label, a, b) => { if (JSON.stringify(a ?? null) !== JSON.stringify(b ?? null)) out.push({ f, label, from: a ?? null, to: b ?? null }); };
+  (n.k || []).forEach((k, i) => add('a.' + i, 'مؤشر: ' + (k.ar || k.en), (o.a || [])[i], n.a[i]));
+  (n.cw || []).forEach((c, i) => add('b.' + i, 'معيار: ' + (c[1] || c[0]), (o.b || [])[i], n.b[i]));
+  for (const k of Object.keys(NOTE_NAMES)) add('n.' + k, NOTE_NAMES[k], (o.n || {})[k] || '', (n.n || {})[k] || '');
+  const op = o.pp || {}, np = n.pp || {};
+  for (const k of new Set([...Object.keys(op), ...Object.keys(np)])) if (!['rateDate', 'jobFrom', 'titleFrom', 'refreshRate'].includes(k)) add('pp.' + k, PP_NAMES[k] || k, op[k], np[k]);
+  add('rcs', 'التوصيات', o.rcs || [], n.rcs || []);
+  add('A', 'درجة القسم أ', o.A, n.A); add('B', 'درجة القسم ب', o.B, n.B); add('F', 'الدرجة النهائية', o.F, n.F); add('rc', 'توصيات النظام', o.rc, n.rc);
+  return out;
+}
+/* append-only: entries are only ever pushed */
+function logAct(r, who, act, x = {}) {
+  r.wf.log = r.wf.log || [];
+  r.wf.log.push({ at: now(), by: who.name, email: who.email || '', cap: who.cap || '', act, v: r.v || 1, round: r.wf.round || 0, ...x });
+}
+function addVersion(r, who, kind, reason, prev) {
+  const snap = snapOf(r), v = (r.versions || []).length + 1;
+  const changes = prev ? diffSnap(prev, snap) : [];
+  r.versions = r.versions || [];
+  r.versions.push({ v, at: now(), kind, by: { name: who.name, email: who.email, cap: who.cap }, reason: reason || '', changes,
+    scoreFrom: prev ? prev.F : null, scoreTo: snap.F, sha: sha(snap), snap });
+  r.v = v; return changes;
+}
+function pushSig(r, role, s) { r.wf.sigs = r.wf.sigs || []; const x = { role, ...s, v: r.v || 1, round: r.wf.round || 0 }; r.wf.sigs.push(x); r.wf.sig[role] = x; return x; }
+/* who took part in the current version / round (for separation of duties) */
+function involved(r) {
+  const w = r.wf, cur = (w.sigs || []).filter((s) => s.v === r.v && s.round === w.round);
+  const editors = (r.versions || []).filter((x) => x.kind === 'hr_edit' || x.kind === 'correction').map((x) => x.by.email);
+  return { evaluator: r.ev.email, forwarder: (cur.find((s) => s.role === 'hr') || {}).email, gm: (cur.find((s) => s.role === 'gm') || {}).email, editors };
+}
+/* existing evaluations get version 1 from their current content; nothing is archived retroactively */
+let MIGRATED = false;
+async function migrateV3() {
+  if (MIGRATED) return; const m = await getJSON('mig/v3', null); if (m) { MIGRATED = true; return; }
+  const all = await getJSON('evals', {}), ts = now();
+  for (const r of Object.values(all)) {
+    if (r.v) continue;
+    r.submitted = r.submitted || r.created;
+    if (!r.wf) r.wf = { stage: r.status === 'signed' ? 'done' : 'hr', ceo: false, ack: crypto.randomBytes(9).toString('base64url'), sig: {}, log: [] };
+    r.wf.round = ['gm', 'ceo', 'done'].includes(r.wf.stage) ? 1 : 0;
+    r.versions = []; const snap = snapOf(r);
+    r.versions.push({ v: 1, at: r.created, kind: 'migrated', by: { name: r.ev.name, email: r.ev.email, cap: 'evaluator' }, reason: '', changes: [], scoreFrom: null, scoreTo: r.F, sha: sha(snap), snap });
+    r.v = 1; r.wf.sigs = [];
+    for (const [role, s] of Object.entries(r.wf.sig || {})) { const x = { role, ...s, v: 1, round: role === 'mgr' || role === 'emp' ? 0 : r.wf.round }; r.wf.sigs.push(x); r.wf.sig[role] = x; }
+    if (r.wf.stage === 'done') r.legacyDone = true;
+  }
+  await setJSON('evals', all);
+  const us = await users(); for (const u of Object.values(us)) if (u.role === 'admin' && u.owner === undefined) u.owner = true; await setJSON('users', us);
+  const st = await getJSON('settings', {}); if (!st.records_start) st.records_start = ts; await setJSON('settings', st);
+  await setJSON('mig/v3', { at: ts }); MIGRATED = true;
+}
+
+/* ---------- official approvals register ---------- */
+const EXEC_NAMES = { na: 'لا يوجد أثر تنفيذي', scheduled: 'مجدول — قبل تاريخ النفاذ', due: 'مستحق التنفيذ', executed: 'نُفّذ', reversal_pending: 'بانتظار عكس الأثر', reversed: 'عُكس الأثر', adjust_pending: 'بانتظار التسوية', adjusted: 'سُوّي', cancelled: 'أُلغي التنفيذ' };
+const REC_STATUS = { active: 'سارٍ', superseded: 'مستبدل', cancelled: 'ملغى' };
+const today = () => now().slice(0, 10);
+const hasEffect = (pp) => !!pp && pp.k !== 'periodic' && pp.k !== 'confirm';
+const execInit = (pp) => (!hasEffect(pp) ? 'na' : (pp.date || '') > today() ? 'scheduled' : 'due');
+const execNow = (x) => (x.exec.status === 'scheduled' && (x.effective || '') <= today() ? 'due' : x.exec.status);
+async function recIndex() { return getJSON('records', { seq: {}, items: {} }); }
+function empMeta(id) {
+  const e = (SEED && SEED.emps.find((x) => x[0] === id)) || null, pf = (SEED && SEED.profiles[id]) || {};
+  const co = ((SEED && SEED.orgs.companies) || []).find((c) => c.id === pf.company), br = ((SEED && SEED.orgs.brands) || []).find((c) => c.id === pf.brand);
+  return { branch: e ? (e[4] || e[3]) : '', branch_en: e ? e[3] : '', company: pf.company || '', companyName: co ? (co.ar || co.en) : '', brandName: br ? (br.ar || br.en) : '' };
+}
+function nextRef(idx, prefix) { const y = today().slice(0, 4), k = prefix + y; idx.seq[k] = (idx.seq[k] || 0) + 1; return prefix + '-' + y + '-' + String(idx.seq[k]).padStart(6, '0'); }
+/* archive an evaluation that reached final approval: exactly once per (evaluation, version) */
+async function archiveEval(r, extra = {}) {
+  if (r.legacyDone && !extra.force) return null;
+  const idx = await recIndex();
+  const have = Object.values(idx.items).find((x) => x.srcId === r.id && x.v === r.v);
+  if (have) { if (r.recordRef !== have.ref) { r.recordRef = have.ref; } return have; }
+  const dept = SEED && SEED.depts.find((d) => d.no === r.emp.dept), meta = empMeta(r.emp.id);
+  const ref = nextRef(idx, 'OR'), ts = now(), fin = (r.wf.sigs || []).filter((s) => s.v === r.v && s.round === r.wf.round);
+  const content = { eval: JSON.parse(JSON.stringify(r)), versions: r.versions.map((x) => ({ v: x.v, at: x.at, kind: x.kind, by: x.by, reason: x.reason, sha: x.sha })) };
+  const item = { ref, type: 'performance_eval', typeName: 'تقييم أداء', module: 'performance', srcId: r.id, v: r.v, round: r.wf.round,
+    title: (r.pp && r.pp.k !== 'periodic' ? ({ raise: 'زيادة راتب', promo_raise: 'ترقية مع زيادة', promo: 'ترقية', move: 'نقل', confirm: 'تثبيت' })[r.pp.k] + ' — ' : '') + ({ annual: 'سنوي', mid: 'نصف سنوي', quarter: 'ربع سنوي', probation: 'نهاية التجربة' }[r.type] || r.type) + ' ' + r.period,
+    emp: { id: r.emp.id, name: r.emp.name, code: r.emp.code, dept: r.emp.dept, deptName: dept ? dept.ar : '', branch: meta.branch, company: meta.company, companyName: meta.companyName, brand: meta.brandName },
+    F: r.F, archived: ts, approvedAt: (fin.find((s) => s.role === (r.wf.ceo ? 'ceo' : 'gm')) || {}).at || ts, submitted: r.submitted, effective: (r.pp && r.pp.date) || '',
+    status: 'active', exec: { status: execInit(r.pp), history: [] }, supersedes: extra.supersedes || '', supersededBy: '', cancelledBy: '', changeRequests: [], notes: [],
+    chain: fin.map((s) => ({ role: s.role, name: s.name, title: s.title || '', email: s.email || '', at: s.at, v: s.v, round: s.round })), sha: sha(content) };
+  await setJSON('rec/' + ref, { ...item, content });
+  idx.items[ref] = item; await setJSON('records', idx);
+  r.recordRef = ref; return item;
+}
+/* retry: any final approval not yet in the register (e.g. a failed write) is archived now */
+async function sweepRecords() {
+  const st = await settings(); if (!st.records_start) return 0;
+  const all = await evals(); let n = 0;
+  for (const r of Object.values(all)) if (r.wf && r.wf.stage === 'done' && !r.legacyDone && !r.recordRef) { await archiveEval(r); n++; }
+  if (n) await setJSON('evals', all);
+  return n;
+}
+function scopeOk(u, item) {
+  if (u.role !== 'auditor') return true;
+  const sc = u.scope || {}, co = sc.companies || [], br = sc.branches || [];
+  return (!co.length || co.includes(item.emp.company)) && (!br.length || br.includes(item.emp.branch));
+}
+async function recReader(token) {
+  const a = await auth(token); if (!['admin', 'gm', 'ceo', 'auditor'].includes(a.u.role)) err('forbidden', 'سجل الموافقات للإدارة والموارد البشرية والتدقيق فقط'); return a;
+}
+const recSummary = (x) => ({ ...x, exec: { ...x.exec, status: execNow(x) }, notesOpen: (x.notes || []).filter((n) => n.status !== 'closed').length });
 
 /* ---------- routes ---------- */
 const R = {
@@ -262,6 +444,14 @@ const R = {
       res.unread = Object.values(await evals()).filter((x) => !x.read).length;
     }
     res.boxUnread = (await boxItems(email, u)).filter((i) => i.unread).length;
+    res.fx = st.fx || null;
+    if (['admin', 'gm', 'ceo', 'auditor'].includes(pu.role)) {
+      if (pu.role === 'admin') { try { await sweepRecords(); } catch (e) { console.error('sweep', e); } }
+      const idx = await recIndex(), its = Object.values(idx.items).filter((x) => scopeOk(u, x)), crs = Object.values(await getJSON('chreqs', {}));
+      res.recStats = { total: its.length, due: its.filter((x) => ['due', 'reversal_pending', 'adjust_pending'].includes(execNow(x))).length, notes: its.reduce((t, x) => t + (x.notes || []).filter((n) => n.status !== 'closed').length, 0),
+        changes: crs.filter((c) => (pu.role === 'gm' && c.status === 'pending_gm') || (pu.role === 'ceo' && c.status === 'pending_ceo')).length };
+    }
+    if (pu.role === 'admin') res.users = Object.entries(await users()).filter(([, x]) => x.role === 'admin').map(([e, x]) => ({ email: e, name: x.name }));
     return res;
   },
   async unlockData({ token, passphrase }) {
@@ -280,27 +470,36 @@ const R = {
     if (!TYPES[rec.type]) err('invalid', 'نوع التقييم غير صالح');
     const period = String(rec.period || '').slice(0, 20); if (!period) err('invalid', 'حدد الفترة');
     const a = (rec.a || []).map((v) => score(v, true)), b = (rec.b || []).map((v) => score(v, false));
-    if (a.length !== job.b.kpis.length || b.length !== SEED.crit.length) err('invalid', 'عدد الدرجات لا يطابق النموذج، حدّث الصفحة');
+    const ex0 = rec.id ? (await evals())[rec.id] : null, nk = ex0 ? ex0.k.length : job.b.kpis.length, nc = ex0 ? ex0.cw.length : SEED.crit.length;
+    if (a.length !== nk || b.length !== nc) err('invalid', 'عدد الدرجات لا يطابق النموذج، حدّث الصفحة');
     if (a.every((v) => v === null)) err('invalid', 'يجب تقييم مؤشر أداء واحد على الأقل');
-    const c = calc(job.b.kpis, a, b, rec.type), clip = (s) => String(s || '').slice(0, 1500), n = rec.n || {};
+    const c = ex0 ? {} : calc(job.b.kpis, a, b, rec.type), clip = (s) => String(s || '').slice(0, 1500), n = rec.n || {};
     const all = await evals();
-    let ex = rec.id && all[rec.id] && (all[rec.id].ev.email === email || pu.role === 'admin') ? all[rec.id] : null;
-    if (!rec.id) ex = Object.values(all).find((x) => x.ev.email === email && x.emp.id === e[0] && x.type === rec.type && x.period === period) || null;
-    if (ex && ex.status === 'signed') err('locked', 'هذا التقييم موقّع ومحفوظ ولا يمكن تعديله. راجع الموارد البشرية.');
-    if (ex && ex.wf && !['employee', 'returned'].includes(ex.wf.stage) && pu.role !== 'admin') err('locked', 'التقييم قيد الاعتماد ولا يمكن تعديله الآن. راجع الموارد البشرية.');
+    let ex = rec.id && all[rec.id] ? all[rec.id] : null;
+    if (!rec.id) ex = Object.values(all).find((x) => x.ev.email === email && x.emp.id === e[0] && x.type === rec.type && x.period === period && (!x.wf || x.wf.stage !== 'cancelled')) || null;
+    if (ex && ex.ev.email !== email) err('forbidden', pu.role === 'admin' ? 'تعديل الموارد البشرية يتم من «تعديل الموارد البشرية» مع ذكر السبب' : 'هذه الاستمارة لمقيّم آخر');
+    if (ex && (ex.status === 'signed' || (ex.wf && ex.wf.stage === 'done'))) err('locked', 'هذا التقييم معتمد ومحفوظ ولا يمكن تعديله. التصحيح يتم بطلب من سجل الموافقات الرسمية.');
+    if (ex && ex.wf && ex.wf.stage === 'cancelled') err('locked', 'هذه الاستمارة ملغاة');
+    if (ex && ex.wf && !['employee', 'returned'].includes(ex.wf.stage)) err('locked', 'التقييم قيد الاعتماد ولا يمكن تعديله الآن. راجع الموارد البشرية.');
     const sig = cleanSig(rec.sig) || (u.sig || ''); if (!sig) err('invalid', 'التوقيع الإلكتروني للمقيّم مطلوب');
+    const fx = (await settings()).fx, pp = buildPurpose({ ...(rec.pp || {}), allowIncomplete: true }, e, fx, null);
     const ts = now(), id = ex ? ex.id : crypto.randomBytes(5).toString('hex').toUpperCase();
     const out = {
-      id, created: ex ? ex.created : ts, updated: ts, type: rec.type, period,
+      id, created: ex ? ex.created : ts, updated: ts, submitted: ex ? (ex.submitted || ex.created) : ts, resubmitted: ex ? ts : '', type: rec.type, period,
       emp: { id: e[0], name: e[1], code: e[2], dept: job.dept, br: e[4] || e[3], rep: e[6] || e[5] },
       a, b, ...c, n: { s: clip(n.s), d: clip(n.d), t: clip(n.t), g: clip(n.g) },
-      pp: cleanPurpose(rec.pp), rcs: (Array.isArray(rec.rcs) ? rec.rcs : []).filter((x, i, a) => REC_KEYS.includes(x) && a.indexOf(x) === i),
-      k: job.b.kpis.map((x) => ({ en: x.en, ar: x.ar, t_en: x.t_en, t_ar: x.t_ar, w: x.w })), cw: SEED.crit.map((x) => [x[0], x[1], x[2]]),
+      pp, rcs: (Array.isArray(rec.rcs) ? rec.rcs : []).filter((x, i, a) => REC_KEYS.includes(x) && a.indexOf(x) === i),
+      k: ex0 ? ex0.k : job.b.kpis.map((x) => ({ en: x.en, ar: x.ar, t_en: x.t_en, t_ar: x.t_ar, w: x.w })), cw: ex0 ? ex0.cw : SEED.crit.map((x) => [x[0], x[1], x[2]]),
       ev: { email: ex ? ex.ev.email : email, name: String(rec.evName || u.name).slice(0, 80), title: String(rec.evTitle || u.title || '').slice(0, 80) },
-      status: ex ? ex.status : 'new', read: false,
+      status: ex ? ex.status : 'new', read: false, versions: ex ? ex.versions || [] : [], v: ex ? ex.v : 0,
     };
-    out.wf = { stage: 'employee', ceo: false, ack: (ex && ex.wf && ex.wf.ack) || crypto.randomBytes(9).toString('base64url'),
-      sig: { mgr: { name: out.ev.name, title: out.ev.title, email: out.ev.email, at: ts, img: sig } }, log: ((ex && ex.wf && ex.wf.log) || []).concat([{ at: ts, by: u.name, act: ex ? 'resubmit' : 'submit' }]).slice(-40) };
+    if (ex0) Object.assign(out, calcWith(out.k, out.cw, a, b, rec.type));
+    const xw = (ex && ex.wf) || {};
+    out.wf = { stage: 'employee', ceo: false, round: xw.round || 0, ack: xw.ack || crypto.randomBytes(9).toString('base64url'), sig: {}, sigs: xw.sigs || [], log: xw.log || [], recalled: xw.recalled || null };
+    const who = { name: u.name, email, cap: 'evaluator' };
+    const changes = addVersion(out, who, ex ? 'resubmit' : 'submit', '', ex ? snapOf(ex) : null);
+    pushSig(out, 'mgr', { name: out.ev.name, title: out.ev.title, email: out.ev.email, at: ts, img: sig });
+    logAct(out, who, ex ? 'resubmit' : 'submit', { changes, scoreFrom: ex ? ex.F : null, scoreTo: out.F, stFrom: ex ? ex.wf && ex.wf.stage : '', stTo: 'employee' });
     const sf = Object.values(await getJSON('selfs', {})).filter((x) => x.status === 'done' && x.emp.id === e[0] && x.type === rec.type && x.period === period).sort((a, b) => (a.submitted < b.submitted ? 1 : -1))[0];
     if (sf) out.self = { code: sf.code, a: sf.a, b: sf.b, A: sf.A, B: sf.B, F: sf.F, r: sf.r, n: sf.n, at: sf.submitted };
     all[id] = out; await setJSON('evals', all);
@@ -312,13 +511,14 @@ const R = {
   async listEvals({ token }) { await admin(token); return { evals: Object.values(await evals()).sort((a, b) => (a.updated < b.updated ? 1 : -1)) }; },
   async markEval({ token, id, status, read, archived }) {
     await admin(token); const all = await evals(); if (!all[id]) err('not_found', 'التقييم غير موجود');
-    if (status !== undefined) { if (!STATUSES.includes(status)) err('invalid', 'حالة غير صالحة'); all[id].status = status; }
+    if (status !== undefined) { if (!STATUSES.includes(status)) err('invalid', 'حالة غير صالحة'); const w = all[id].wf || {}; if ((status === 'signed') !== (w.stage === 'done') && (status === 'signed' || all[id].status === 'signed')) err('locked', 'الاعتماد النهائي يتم عبر سلسلة الاعتماد فقط'); all[id].status = status; }
     if (read !== undefined) all[id].read = !!read;
     if (archived !== undefined) all[id].archived = !!archived;
     await setJSON('evals', all); return {};
   },
   async deleteEval({ token, id }) {
     const me = await admin(token), all = await evals(); if (!all[id]) err('not_found', 'التقييم غير موجود');
+    const w0 = all[id].wf || {}; if (all[id].recordRef || w0.round > 0 || ['done', 'cancelled', 'gm', 'ceo'].includes(w0.stage)) err('locked', 'لا تُحذف استمارة أُحيلت للاعتماد أو اعتُمدت أو أُلغيت؛ تبقى بياناتها وسجلها. استخدم «إلغاء» مع السبب.');
     const t = await getJSON('trash', {}); t[id] = { ...all[id], deleted: now(), deletedBy: me.email }; delete all[id];
     await setJSON('trash', t); await setJSON('evals', all); return {};
   },
@@ -462,29 +662,36 @@ const R = {
     const all = await evals(), r = Object.values(all).find((x) => x.wf && x.wf.ack === String(code || '')); if (!r) err('not_found', 'الرابط غير صالح أو انتهت صلاحيته');
     if (r.wf.stage !== 'employee') err('locked', 'تم توقيع هذا التقييم مسبقاً');
     const sig = cleanSig(img); if (!sig) err('invalid', 'التوقيع مطلوب'); const ts = now();
-    r.wf.sig.emp = { name: r.emp.name, at: ts, img: sig }; r.n.e = String(note || '').slice(0, 1500); r.wf.stage = 'hr'; r.read = false; r.updated = ts;
-    r.wf.log.push({ at: ts, by: r.emp.name, act: 'employee-sign' }); await setJSON('evals', all); return { stage: 'hr' };
+    pushSig(r, 'emp', { name: r.emp.name, at: ts, img: sig }); r.n.e = String(note || '').slice(0, 1500); r.wf.stage = 'hr'; r.read = false; r.updated = ts;
+    logAct(r, { name: r.emp.name, email: '', cap: 'employee' }, 'employee-sign', { stFrom: 'employee', stTo: 'hr' }); await setJSON('evals', all); return { stage: 'hr' };
   },
-  async wfAction({ token, id, act, img, note, ceo }) {
+  async wfAction({ token, id, act, img, note, ceo, v, round }) {
+    await loadData(false);
     const { email, u } = await auth(token), role = roleOf(u), all = await evals(), r = all[id]; if (!r) err('not_found', 'التقييم غير موجود');
-    const ts = now(), sig = cleanSig(img) || u.sig || '', who = { name: u.name, title: u.title || '', email, at: ts, img: sig };
-    note = String(note || '').slice(0, 600);
-    if (!r.wf) r.wf = { stage: 'hr', ceo: false, ack: crypto.randomBytes(9).toString('base64url'), sig: {}, log: [] };
+    const ts = now(), sig = cleanSig(img) || u.sig || '', who = { name: u.name, title: u.title || '', email, at: ts, img: sig }, actor = { name: u.name, email, cap: capOf(u) };
+    note = String(note || '').slice(0, 600); const from = r.wf.stage;
     const need = (st, roles) => { if (!roles.includes(role)) err('forbidden', 'ليست لديك صلاحية هذا الإجراء'); if (!st.includes(r.wf.stage)) err('invalid', 'المرحلة الحالية: ' + WF_NAMES[r.wf.stage]); };
     const needSig = () => { if (!sig) err('invalid', 'التوقيع الإلكتروني مطلوب'); };
+    /* an approval is bound to the version and round it reviewed */
+    const bound = () => { if (Number(v) !== r.v || Number(round) !== r.wf.round) err('stale_version', 'تغيّرت الاستمارة بعد فتحها (النسخة الحالية ' + r.v + '). حدّث الصفحة وراجع النسخة الأخيرة قبل الاعتماد.'); };
+    const inv = involved(r), sep = (list) => { if (list.filter(Boolean).includes(email)) err('forbidden', 'فصل المهام: لا يعتمد من قيّم الموظف أو أحال الاستمارة أو عدّلها أو اعتمدها في مرحلة سابقة'); };
     if (act === 'hr_forward') {
       need(['hr', 'employee'], ['admin']); needSig();
-      if (r.wf.stage === 'employee') r.wf.sig.emp = { name: r.emp.name, at: ts, paper: true };
-      r.wf.sig.hr = who; r.wf.ceo = !!ceo; r.wf.stage = 'gm';
+      if (r.pp && r.pp.incomplete) err('invalid', 'أكمل بيانات الزيادة (الراتب الأساسي والعملة) من «تعديل الموارد البشرية» قبل الإحالة');
+      r.wf.round = (r.wf.round || 0) + 1;
+      if (r.wf.stage === 'employee') pushSig(r, 'emp', { name: r.emp.name, at: ts, paper: true });
+      pushSig(r, 'hr', who); r.wf.ceo = !!ceo; r.wf.stage = 'gm';
     } else if (act === 'hr_return') { need(['hr', 'employee'], ['admin']); r.wf.stage = 'returned'; r.wf.sig = { mgr: r.wf.sig.mgr }; }
-    else if (act === 'gm_approve') { need(['gm'], ['gm']); needSig(); r.wf.sig.gm = who; r.wf.stage = r.wf.ceo ? 'ceo' : 'done'; }
+    else if (act === 'gm_approve') { need(['gm'], ['gm']); bound(); sep([inv.evaluator, inv.forwarder, ...inv.editors]); needSig(); pushSig(r, 'gm', who); r.wf.stage = r.wf.ceo ? 'ceo' : 'done'; }
     else if (act === 'gm_return') { need(['gm'], ['gm']); r.wf.stage = 'hr'; delete r.wf.sig.hr; }
-    else if (act === 'ceo_approve') { need(['ceo'], ['ceo']); needSig(); r.wf.sig.ceo = who; r.wf.stage = 'done'; }
+    else if (act === 'ceo_approve') { need(['ceo'], ['ceo']); bound(); sep([inv.evaluator, inv.forwarder, inv.gm, ...inv.editors]); needSig(); pushSig(r, 'ceo', who); r.wf.stage = 'done'; }
     else if (act === 'ceo_return') { need(['ceo'], ['ceo']); r.wf.stage = 'hr'; delete r.wf.sig.hr; delete r.wf.sig.gm; }
     else if (act === 'set_ceo') { need(['hr', 'gm', 'employee'], ['admin']); r.wf.ceo = !!ceo; }
     else err('bad_action', 'إجراء غير معروف');
-    if (r.wf.stage === 'done') r.status = 'signed';
-    r.wf.log.push({ at: ts, by: u.name, act, note }); r.updated = ts; await setJSON('evals', all);
+    if (r.wf.stage === 'done') { r.status = 'signed'; r.doneAt = ts; }
+    logAct(r, actor, act, { note, stFrom: from, stTo: r.wf.stage }); r.updated = ts;
+    if (r.wf.stage === 'done') { try { await archiveEval(r); } catch (e) { console.error('archive', e); } }
+    await setJSON('evals', all);
     await logVisit(email, u.name, 'wf-' + act, r.emp.id); return { eval: r };
   },
   async myBox({ token }) { const { email, u } = await auth(token); const items = await boxItems(email, u); return { items, unread: items.filter((i) => i.unread).length }; },
@@ -497,7 +704,7 @@ const R = {
   async listApprovals({ token }) {
     const { email, u } = await auth(token), role = roleOf(u); const l = Object.values(await evals());
     let out = [];
-    if (role === 'admin') out = l.filter((x) => x.wf && x.wf.stage !== 'done');
+    if (role === 'admin') out = l.filter((x) => x.wf && x.wf.stage !== 'done' && x.wf.stage !== 'cancelled');
     else if (role === 'gm') out = l.filter((x) => x.wf && (x.wf.stage === 'gm' || (x.wf.sig.gm && x.wf.sig.gm.email === email)));
     else if (role === 'ceo') out = l.filter((x) => x.wf && (x.wf.stage === 'ceo' || (x.wf.sig.ceo && x.wf.sig.ceo.email === email)));
     else out = l.filter((x) => x.ev.email === email && x.wf);
@@ -516,11 +723,184 @@ const R = {
     await setJSON('trash', t); return {};
   },
 
+  /* ---------- v3: exchange rate, raise preview ---------- */
+  async saveFx({ token, rate }) {
+    const { email, u } = await admin(token), x = Number(rate); if (!(x > 0 && x < 1e6)) err('invalid', 'سعر الصرف غير صالح');
+    const s = await getJSON('settings', {}); const fx = { rate: rnd(x, 4), date: today(), at: now(), by: u.name, email };
+    s.fxLog = (s.fxLog || []).concat([fx]).slice(-200); s.fx = fx; await setJSON('settings', s); await logVisit(email, u.name, 'fx-set', String(fx.rate));
+    return { fx };
+  },
+  async raisePreview({ token, pp, keepRate }) {
+    await auth(token); const st = await settings(); const fx = keepRate && keepRate.rate ? keepRate : st.fx;
+    return { raise: computeRaise(pp || {}, fx), fx: st.fx || null };
+  },
+  async getEval({ token, id }) {
+    const { email, u } = await auth(token), r = (await evals())[id]; if (!r) err('not_found', 'التقييم غير موجود');
+    const role = roleOf(u), mine = r.ev.email === email;
+    if (!(mine || ['admin', 'gm', 'ceo'].includes(role))) {
+      if (role === 'auditor' && r.recordRef) { const it = (await recIndex()).items[r.recordRef]; if (it && scopeOk(u, it)) return { eval: r }; }
+      err('forbidden', 'ليست لديك صلاحية عرض هذا التقييم');
+    }
+    return { eval: r };
+  },
+  /* ---------- v3: HR / owner on a form in review ---------- */
+  async hrEdit({ token, id, rec = {}, reason }) {
+    await loadData(); const { email, u } = await admin(token); needGrant(u, 'edit'); reason = needReason(reason);
+    const all = await evals(), r = all[id]; if (!r) err('not_found', 'التقييم غير موجود');
+    const st = r.wf.stage;
+    if (st === 'gm' || st === 'ceo') err('recall_first', 'الاستمارة محالة إلى ' + WF_NAMES[st] + '. استرجعها أولاً ثم عدّلها.');
+    if (st === 'done') err('locked', 'الاستمارة معتمدة ومؤرشفة. التعديل يتم بطلب تصحيح من سجل الموافقات الرسمية.');
+    if (st !== 'hr') err('invalid', 'التعديل متاح في مرحلة مراجعة الموارد البشرية فقط (المرحلة الحالية: ' + WF_NAMES[st] + ')');
+    if (r.ev.email === email) err('forbidden', 'لا يعدّل المقيّم استمارته من هنا');
+    const e = SEED.emps.find((x) => x[0] === r.emp.id) || [r.emp.id, r.emp.name, r.emp.code];
+    const a = (rec.a || r.a).map((v) => score(v, true)), b = (rec.b || r.b).map((v) => score(v, false));
+    if (a.length !== r.k.length || b.length !== r.cw.length) err('invalid', 'عدد الدرجات لا يطابق الاستمارة');
+    if (a.every((v) => v === null)) err('invalid', 'يجب تقييم مؤشر أداء واحد على الأقل');
+    const prev = snapOf(r), clip = (s) => String(s || '').slice(0, 1500), n = rec.n || r.n;
+    const fx = (await settings()).fx;
+    const pp = rec.pp ? buildPurpose(rec.pp, e, fx, r.pp) : r.pp;
+    const next = { ...r, a, b, ...calcWith(r.k, r.cw, a, b, r.type), n: { s: clip(n.s), d: clip(n.d), t: clip(n.t), g: clip(n.g), e: r.n.e || '' }, pp,
+      rcs: (Array.isArray(rec.rcs) ? rec.rcs : r.rcs || []).filter((x, i, l) => REC_KEYS.includes(x) && l.indexOf(x) === i) };
+    if (!diffSnap(prev, snapOf(next)).length) err('no_change', 'لا يوجد تغيير على الاستمارة');
+    Object.assign(r, next);
+    const who = { name: u.name, email, cap: capOf(u) }, changes = addVersion(r, who, 'hr_edit', reason, prev);
+    logAct(r, who, 'hr_edit', { reason, changes, scoreFrom: prev.F, scoreTo: r.F, stFrom: st, stTo: st });
+    r.updated = now(); await setJSON('evals', all); await logVisit(email, u.name, 'eval-hr-edit', r.emp.id); return { eval: r };
+  },
+  async recall({ token, id, reason }) {
+    const { email, u } = await admin(token); needGrant(u, 'recall'); reason = needReason(reason);
+    const all = await evals(), r = all[id]; if (!r) err('not_found', 'التقييم غير موجود');
+    const st = r.wf.stage; if (st !== 'gm' && st !== 'ceo') err('invalid', 'الاسترجاع متاح بعد الإحالة إلى المدير العام أو الرئيس التنفيذي وقبل الاعتماد النهائي');
+    const who = { name: u.name, email, cap: capOf(u) };
+    r.wf.recalled = { at: now(), by: u.name, email, cap: who.cap, reason, v: r.v, round: r.wf.round, from: st };
+    r.wf.stage = 'hr'; r.wf.sig = { mgr: r.wf.sig.mgr, emp: r.wf.sig.emp };
+    logAct(r, who, 'recall', { reason, stFrom: st, stTo: 'hr' }); r.updated = now(); r.read = false;
+    await setJSON('evals', all); await logVisit(email, u.name, 'eval-recall', r.emp.id); return { eval: r };
+  },
+  async cancelEval({ token, id, reason }) {
+    const { email, u } = await admin(token); needGrant(u, 'cancel'); reason = needReason(reason);
+    const all = await evals(), r = all[id]; if (!r) err('not_found', 'التقييم غير موجود');
+    const st = r.wf.stage;
+    if (st === 'done') err('locked', 'الاستمارة معتمدة ومؤرشفة. الإلغاء يتم بطلب إلغاء من سجل الموافقات الرسمية.');
+    if (st === 'cancelled') err('invalid', 'الاستمارة ملغاة مسبقاً');
+    const who = { name: u.name, email, cap: capOf(u) };
+    r.wf.cancelled = { at: now(), by: u.name, email, cap: who.cap, reason, from: st }; r.wf.stage = 'cancelled';
+    logAct(r, who, 'cancel', { reason, stFrom: st, stTo: 'cancelled' }); r.updated = now();
+    await setJSON('evals', all); await logVisit(email, u.name, 'eval-cancel', r.emp.id); return { eval: r };
+  },
+
+  /* ---------- v3: official approvals register ---------- */
+  async listRecords({ token }) {
+    await loadData(false); const { u } = await recReader(token); if (u.role === 'admin') await sweepRecords();
+    const idx = await recIndex(); return { records: Object.values(idx.items).filter((x) => scopeOk(u, x)).map(recSummary).sort((a, b) => (a.archived < b.archived ? 1 : -1)) };
+  },
+  async getRecord({ token, ref }) {
+    const { email, u } = await recReader(token), idx = await recIndex(), it = idx.items[ref]; if (!it || !scopeOk(u, it)) err('not_found', 'السجل غير موجود');
+    const full = await getJSON('rec/' + ref, null); if (!full) err('not_found', 'محتوى السجل غير موجود');
+    const intact = sha(full.content) === it.sha;
+    const crs = Object.values(await getJSON('chreqs', {})).filter((c) => c.ref === ref);
+    await logVisit(email, u.name, 'record-view', ref);
+    return { record: { ...recSummary(it), content: full.content, intact }, changes: crs };
+  },
+  async recordNote({ token, ref, text }) {
+    const { email, u } = await recReader(token); if (u.role !== 'auditor') err('forbidden', 'ملاحظات التدقيق للمدقق الداخلي');
+    text = needReason(text, 3); const idx = await recIndex(), it = idx.items[ref]; if (!it || !scopeOk(u, it)) err('not_found', 'السجل غير موجود');
+    it.notes = it.notes || []; it.notes.push({ id: crypto.randomBytes(4).toString('hex'), at: now(), by: u.name, email, text, status: 'open', replies: [] });
+    await setJSON('records', idx); return { record: recSummary(it) };
+  },
+  async noteReply({ token, ref, noteId, text, status }) {
+    const { email, u } = await recReader(token), idx = await recIndex(), it = idx.items[ref]; if (!it || !scopeOk(u, it)) err('not_found', 'السجل غير موجود');
+    const n = (it.notes || []).find((x) => x.id === noteId); if (!n) err('not_found', 'الملاحظة غير موجودة');
+    if (text) n.replies.push({ at: now(), by: u.name, email, cap: capOf(u), text: String(text).slice(0, 1500) });
+    if (status) { if (!['open', 'answered', 'closed'].includes(status)) err('invalid', 'حالة غير صالحة'); if (status === 'closed' && u.role !== 'auditor') err('forbidden', 'إغلاق الملاحظة للمدقق الداخلي'); n.status = status; }
+    else if (text && u.role !== 'auditor' && n.status === 'open') n.status = 'answered';
+    await setJSON('records', idx); return { record: recSummary(it) };
+  },
+  async markExec({ token, ref, status, note }) {
+    const { email, u } = await admin(token); needGrant(u, 'exec'); note = needReason(note, 3);
+    const idx = await recIndex(), it = idx.items[ref]; if (!it) err('not_found', 'السجل غير موجود');
+    const cur = execNow(it), MOVES = { due: 'executed', reversal_pending: 'reversed', adjust_pending: 'adjusted' };
+    if (cur === 'scheduled') err('invalid', 'لم يحن تاريخ النفاذ (' + it.effective + ')');
+    if (MOVES[cur] !== status) err('invalid', 'الحالة التنفيذية الحالية: ' + EXEC_NAMES[cur]);
+    if (status === 'executed' && it.status !== 'active') err('invalid', 'السجل ' + REC_STATUS[it.status] + ' ولا يُنفّذ');
+    it.exec.history.push({ at: now(), by: u.name, email, from: cur, to: status, note }); it.exec.status = status; it.exec.at = now(); it.exec.by = u.name;
+    await setJSON('records', idx); await logVisit(email, u.name, 'record-exec', ref + ' ' + status); return { record: recSummary(it) };
+  },
+  /* correction / cancellation of an archived record: a linked request with its own approval chain */
+  async requestChange({ token, ref, kind, reason, rec }) {
+    await loadData(); const { email, u } = await admin(token); needGrant(u, kind === 'cancel' ? 'cancel' : 'edit'); reason = needReason(reason);
+    if (!['correct', 'cancel'].includes(kind)) err('invalid', 'نوع الطلب غير صالح');
+    const idx = await recIndex(), it = idx.items[ref]; if (!it) err('not_found', 'السجل غير موجود');
+    if (it.status !== 'active') err('invalid', 'السجل ' + REC_STATUS[it.status] + ' ولا يقبل طلبات');
+    const all = await getJSON('chreqs', {}); if (Object.values(all).some((c) => c.ref === ref && c.status.startsWith('pending'))) err('exists', 'يوجد طلب قيد الاعتماد على هذا السجل');
+    const r = (await evals())[it.srcId]; if (!r) err('not_found', 'الاستمارة الأصلية غير موجودة');
+    if (r.ev.email === email) err('forbidden', 'المقيّم لا يطلب تغيير سجل تقييمه');
+    const c = { id: '', ref, kind, reason, by: u.name, email, cap: capOf(u), at: now(), status: 'pending_gm', ceo: !!r.wf.ceo, sigs: [], log: [] };
+    if (kind === 'correct') {
+      const e = SEED.emps.find((x) => x[0] === r.emp.id) || [r.emp.id, r.emp.name, r.emp.code];
+      const a = (rec && rec.a || r.a).map((v) => score(v, true)), b = (rec && rec.b || r.b).map((v) => score(v, false));
+      if (a.length !== r.k.length || b.length !== r.cw.length) err('invalid', 'عدد الدرجات لا يطابق الاستمارة');
+      const n = (rec && rec.n) || r.n, clip = (s) => String(s || '').slice(0, 1500);
+      const pp = rec && rec.pp ? buildPurpose(rec.pp, e, (await settings()).fx, r.pp) : r.pp;
+      const next = { ...snapOf(r), a, b, ...calcWith(r.k, r.cw, a, b, r.type), n: { s: clip(n.s), d: clip(n.d), t: clip(n.t), g: clip(n.g), e: r.n.e || '' }, pp,
+        rcs: (Array.isArray(rec && rec.rcs) ? rec.rcs : r.rcs || []).filter((x, i, l) => REC_KEYS.includes(x) && l.indexOf(x) === i) };
+      if (pp && pp.incomplete) err('invalid', 'أكمل بيانات الزيادة');
+      c.proposed = next; c.changes = diffSnap(snapOf(r), next); if (!c.changes.length) err('no_change', 'لا يوجد تغيير');
+      c.scoreFrom = r.F; c.scoreTo = next.F;
+    }
+    const seq = await getJSON('chreqs_seq', {}), y = today().slice(0, 4); seq[y] = (seq[y] || 0) + 1; await setJSON('chreqs_seq', seq);
+    c.id = 'RC-' + y + '-' + String(seq[y]).padStart(5, '0'); c.log.push({ at: c.at, by: u.name, act: 'request', note: reason });
+    all[c.id] = c; await setJSON('chreqs', all); it.changeRequests = (it.changeRequests || []).concat([c.id]); await setJSON('records', idx);
+    await logVisit(email, u.name, 'record-change-request', ref + ' ' + c.id); return { change: c };
+  },
+  async listChanges({ token }) {
+    const { u } = await recReader(token), idx = await recIndex();
+    return { changes: Object.values(await getJSON('chreqs', {})).filter((c) => idx.items[c.ref] && scopeOk(u, idx.items[c.ref])).sort((a, b) => (a.at < b.at ? 1 : -1)) };
+  },
+  async changeAction({ token, id, act, img, note }) {
+    await loadData(false); const { email, u } = await auth(token), role = roleOf(u), all = await getJSON('chreqs', {}), c = all[id]; if (!c) err('not_found', 'الطلب غير موجود');
+    note = String(note || '').slice(0, 600); const ts = now(), sig = cleanSig(img) || u.sig || '';
+    if (act === 'withdraw') { if (c.email !== email || !c.status.startsWith('pending')) err('forbidden', 'يسحب الطلب من قدّمه قبل اعتماده'); c.status = 'withdrawn'; c.log.push({ at: ts, by: u.name, act, note }); await setJSON('chreqs', all); return { change: c }; }
+    const stage = c.status === 'pending_gm' ? 'gm' : c.status === 'pending_ceo' ? 'ceo' : ''; if (!stage) err('invalid', 'الطلب ليس قيد الاعتماد');
+    if (role !== stage) err('forbidden', 'الطلب بانتظار ' + (stage === 'gm' ? 'المدير العام' : 'الرئيس التنفيذي'));
+    const evs = await evals(), r = evs[(await recIndex()).items[c.ref].srcId];
+    if (email === c.email || email === r.ev.email || c.sigs.some((s) => s.email === email)) err('forbidden', 'فصل المهام: لا يعتمد الطلب من قدّمه أو من قيّم الموظف أو من وقّعه سابقاً');
+    if (act === 'reject') { c.status = 'rejected'; c.log.push({ at: ts, by: u.name, act, note }); await setJSON('chreqs', all); return { change: c }; }
+    if (act !== 'approve') err('bad_action', 'إجراء غير معروف'); if (!sig) err('invalid', 'التوقيع الإلكتروني مطلوب');
+    c.sigs.push({ role: stage, name: u.name, title: u.title || '', email, at: ts, img: sig }); c.log.push({ at: ts, by: u.name, act: 'approve', note });
+    if (stage === 'gm' && c.ceo) { c.status = 'pending_ceo'; await setJSON('chreqs', all); return { change: c }; }
+    /* final approval: apply */
+    const idx = await recIndex(), it = idx.items[c.ref]; if (it.status !== 'active') err('invalid', 'السجل لم يعد سارياً');
+    const who = { name: c.by, email: c.email, cap: c.cap }, wasExec = execNow(it);
+    if (c.kind === 'cancel') {
+      it.status = 'cancelled'; it.cancelledBy = c.id; it.cancelledAt = ts;
+      const to = wasExec === 'executed' || wasExec === 'adjusted' ? 'reversal_pending' : ['scheduled', 'due'].includes(wasExec) ? 'cancelled' : wasExec;
+      if (to !== wasExec) { it.exec.history.push({ at: ts, by: 'النظام', from: wasExec, to, note: 'إلغاء معتمد بالطلب ' + c.id }); it.exec.status = to; }
+      r.recordCancelled = c.id; logAct(r, { name: u.name, email, cap: role }, 'record_cancelled', { reason: c.reason, ref: c.ref, change: c.id });
+    } else {
+      const prev = snapOf(r); Object.assign(r, { ...c.proposed, emp: r.emp, ev: r.ev, k: r.k, cw: r.cw, type: r.type, period: r.period });
+      addVersion(r, who, 'correction', c.reason, prev); r.wf.round = (r.wf.round || 0) + 1;
+      for (const s of c.sigs) pushSig(r, s.role, { name: s.name, title: s.title, email: s.email, at: s.at, img: s.img, change: c.id });
+      logAct(r, who, 'correction', { reason: c.reason, changes: c.changes, scoreFrom: prev.F, scoreTo: r.F, ref: c.ref, change: c.id });
+      r.recordRef = ''; await setJSON('evals', evs);
+      const nx = await archiveEval(r, { supersedes: c.ref }); const idx2 = await recIndex(), old = idx2.items[c.ref];
+      old.status = 'superseded'; old.supersededBy = nx.ref; old.supersededAt = ts;
+      if (wasExec === 'executed' || wasExec === 'adjusted') { if (hasEffect(r.pp)) { idx2.items[nx.ref].exec = { status: 'adjust_pending', history: [{ at: ts, by: 'النظام', from: 'new', to: 'adjust_pending', note: 'تصحيح سجل منفّذ ' + c.ref }] }; } }
+      else if (['scheduled', 'due'].includes(wasExec)) { old.exec.history.push({ at: ts, by: 'النظام', from: wasExec, to: 'cancelled', note: 'استُبدل بالسجل ' + nx.ref }); old.exec.status = 'cancelled'; }
+      c.newRef = nx.ref; c.status = 'approved'; c.doneAt = ts;
+      await setJSON('records', idx2); await setJSON('evals', evs); await setJSON('chreqs', all);
+      await logVisit(email, u.name, 'record-corrected', c.ref + '>' + nx.ref); return { change: c };
+    }
+    c.status = 'approved'; c.doneAt = ts;
+    await setJSON('records', idx); await setJSON('evals', evs); await setJSON('chreqs', all);
+    await logVisit(email, u.name, 'record-cancelled', c.ref); return { change: c };
+  },
+
   async listUsers({ token }) {
     const { all } = await admin(token), ev = Object.values(await evals()), vis = await getJSON('visits', []);
     return { users: Object.entries(all).map(([email, u]) => ({
       email, name: u.name, title: u.title || '', role: u.role, depts: deptList(u), allJD: !!u.allJD, active: u.active !== false, perms: permsOf(u),
-      activated: !!u.hash, code: u.hash ? '' : (u.code || ''), created: u.created || '', lastLogin: u.last_login || '',
+      owner: isOwner(u), grants: grantsOf(u), scope: u.scope || null, activated: !!u.hash, code: u.hash ? '' : (u.code || ''), created: u.created || '', lastLogin: u.last_login || '',
       logins: u.visits || 0, actions: vis.filter((v) => v[1] === email).length, evals: ev.filter((x) => x.ev.email === email).length })) };
   },
   async saveUser({ token, user: d = {} }) {
@@ -530,7 +910,16 @@ const R = {
     if (role === 'manager' && !depts.length) err('invalid', 'حدد قسماً واحداً على الأقل للمدير');
     if (email === me.email && (role !== 'admin' || d.active === false)) err('invalid', 'لا يمكنك إزالة صلاحية المدير أو إيقاف حسابك');
     const cur = all[email]; let code = '';
-    all[email] = { ...(cur || {}), name: String(d.name || '').slice(0, 80), title: String(d.title || '').slice(0, 80), role, depts, allJD: !!d.allJD, active: d.active !== false, perms: { jd: !!(d.perms && d.perms.jd), emp: !!(d.perms && d.perms.emp) } };
+    const meOwner = isOwner(me.u), keep = cur || {};
+    if (!meOwner && cur && isOwner(cur)) err('forbidden', 'حساب مالك النظام يعدّله المالك فقط');
+    if (!meOwner && ((d.grants && GRANTS.some((k) => !!d.grants[k] !== !!(keep.grants && keep.grants[k]))) || (d.owner !== undefined && !!d.owner !== !!keep.owner))) err('forbidden', 'منح الصلاحيات الحساسة لمالك النظام فقط');
+    const grants = meOwner ? Object.fromEntries(GRANTS.map((k) => [k, role === 'admin' && !!(d.grants && d.grants[k])])) : (keep.grants || {});
+    const owner = meOwner ? role === 'admin' && !!d.owner : !!keep.owner;
+    if (email === me.email && meOwner && !owner) err('invalid', 'لا يمكنك إزالة صفة المالك عن حسابك');
+    const ids = (l) => (Array.isArray(l) ? l : []).map((x) => String(x).slice(0, 120)).filter(Boolean).slice(0, 50);
+    const scope = role === 'auditor' ? { companies: ids(d.scope && d.scope.companies), branches: ids(d.scope && d.scope.branches) } : null;
+    if (!meOwner && (role === 'auditor' || role === 'admin') && (!cur || cur.role !== role)) err('forbidden', 'منح دور الموارد البشرية أو التدقيق لمالك النظام فقط');
+    all[email] = { ...keep, name: String(d.name || '').slice(0, 80), title: String(d.title || '').slice(0, 80), role, depts, allJD: !!d.allJD, active: d.active !== false, perms: { jd: !!(d.perms && d.perms.jd), emp: !!(d.perms && d.perms.emp) }, grants, owner, scope };
     if (!cur) { code = randCode(); all[email].code = code; all[email].created = now(); all[email].visits = 0; }
     await setJSON('users', all); return { code };
   },
@@ -560,7 +949,7 @@ export default async (req) => {
   if (req.method === 'GET') return ok({ service: 'L-O HR API', version: '1.0' });
   let body; try { body = JSON.parse(await req.text()); } catch { return fail('bad_request', 'طلب غير صالح'); }
   const fn = R[body.action]; if (!fn) return fail('bad_action', 'إجراء غير معروف');
-  try { return ok(await fn(body)); }
+  try { await migrateV3(); return ok(await fn(body)); }
   catch (e) { if (e instanceof ApiError) return fail(e.code, e.message); console.error(e); return fail('server', 'حدث خطأ في الخادم، أعد المحاولة'); }
 };
 
