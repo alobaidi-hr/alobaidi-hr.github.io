@@ -209,7 +209,10 @@ const isOwner = (u) => u.role === 'admin' && !!u.owner;
 const grantsOf = (u) => { const g = {}; for (const k of GRANTS) g[k] = isOwner(u) || (u.role === 'admin' && !!(u.grants && u.grants[k])); return g; };
 const capOf = (u) => (isOwner(u) ? 'owner' : u.role === 'admin' ? 'hr' : u.role === 'manager' ? 'evaluator' : u.role);
 /* the department head who approves after the employee: one manager per department, marked by HR */
+const CHAIN_DEF = { head: true, ops: true, ceo: true, changeOps: true };
+async function chainCfg() { const c = (await getJSON('settings', {})).chain || {}; return { ...CHAIN_DEF, ...c }; }
 async function headFor(r) {
+  if (!(await chainCfg()).head) return { skipped: 'off' };
   const e = Object.entries(await users()).find(([, x]) => x.active !== false && x.role === 'manager' && (x.heads || []).map(Number).includes(Number(r.emp.dept)));
   if (!e) return { skipped: 'none' };
   return { email: e[0], name: e[1].name, title: e[1].title || '', ...(e[0] === r.ev.email ? { skipped: 'self' } : {}) };
@@ -454,12 +457,12 @@ const R = {
       res.unread = Object.values(await evals()).filter((x) => !x.read).length;
     }
     res.boxUnread = (await boxItems(email, u)).filter((i) => i.unread).length;
-    res.fx = st.fx || null;
+    res.fx = st.fx || null; res.chain = await chainCfg();
     if (['admin', 'ops', 'gm', 'ceo', 'auditor'].includes(pu.role)) {
       if (pu.role === 'admin') { try { await sweepRecords(); } catch (e) { console.error('sweep', e); } }
       const idx = await recIndex(), its = Object.values(idx.items).filter((x) => scopeOk(u, x)), crs = Object.values(await getJSON('chreqs', {}));
       res.recStats = { total: its.length, due: its.filter((x) => ['due', 'reversal_pending', 'adjust_pending'].includes(execNow(x))).length, notes: its.reduce((t, x) => t + (x.notes || []).filter((n) => n.status !== 'closed').length, 0),
-        changes: crs.filter((c) => (pu.role === 'gm' && c.status === 'pending_gm') || (pu.role === 'ceo' && c.status === 'pending_ceo')).length };
+        changes: crs.filter((c) => (pu.role === 'ops' && c.status === 'pending_ops' && c.ops && c.ops.email === email) || (pu.role === 'gm' && c.status === 'pending_gm') || (pu.role === 'ceo' && c.status === 'pending_ceo')).length };
     }
     if (pu.role === 'admin') { const us = Object.entries(await users()); res.users = us.filter(([, x]) => x.role === 'admin').map(([e, x]) => ({ email: e, name: x.name })); res.opsUsers = us.filter(([, x]) => x.role === 'ops' && x.active !== false).map(([e, x]) => ({ email: e, name: x.name, title: x.title || '' })); res.heads = Object.fromEntries(us.filter(([, x]) => x.role === 'manager' && x.active !== false).flatMap(([e, x]) => (x.heads || []).map((h) => [h, x.name]))); }
     return res;
@@ -695,7 +698,9 @@ const R = {
     else if (act === 'hr_forward') {
       need(['hr'], ['admin']); needSig();
       if (r.pp && r.pp.incomplete) err('invalid', 'أكمل بيانات الزيادة (الراتب الأساسي والعملة) من «تعديل الموارد البشرية» قبل الإحالة');
-      let op = null;
+      let op = null; const cfg = await chainCfg();
+      if (ops && !cfg.ops) err('invalid', 'خطوة مدير العمليات معطّلة من مالك النظام');
+      if (ceo && !cfg.ceo) err('invalid', 'مصادقة الرئيس التنفيذي معطّلة من مالك النظام');
       if (ops) {
         const ou = (await users())[lower(ops)]; if (!ou || ou.role !== 'ops' || ou.active === false) err('invalid', 'مدير العمليات المختار غير موجود أو غير فعّال');
         if (lower(ops) === r.ev.email) err('forbidden', 'فصل المهام: مدير العمليات هو مقيّم هذه الاستمارة');
@@ -710,7 +715,7 @@ const R = {
     else if (act === 'gm_return') { need(['gm'], ['gm']); r.wf.stage = 'hr'; clear('hr', 'ops'); }
     else if (act === 'ceo_approve') { need(['ceo'], ['ceo']); bound(); sep([inv.evaluator, inv.head, inv.forwarder, inv.ops, inv.gm, ...inv.editors]); needSig(); pushSig(r, 'ceo', who); r.wf.stage = 'done'; }
     else if (act === 'ceo_return') { need(['ceo'], ['ceo']); r.wf.stage = 'hr'; clear('hr', 'ops', 'gm'); }
-    else if (act === 'set_ceo') { need(['hr', 'employee', 'head'], ['admin']); r.wf.ceo = !!ceo; }
+    else if (act === 'set_ceo') { need(['hr', 'employee', 'head'], ['admin']); if (ceo && !(await chainCfg()).ceo) err('invalid', 'مصادقة الرئيس التنفيذي معطّلة من مالك النظام'); r.wf.ceo = !!ceo; }
     else err('bad_action', 'إجراء غير معروف');
     if (r.wf.stage === 'done') { r.status = 'signed'; r.doneAt = ts; }
     logAct(r, actor, act, { note, stFrom: from, stTo: r.wf.stage }); r.updated = ts;
@@ -749,6 +754,28 @@ const R = {
   },
 
   /* ---------- v3: exchange rate, raise preview ---------- */
+  /* the owner controls the approval chain, and can move forms already in progress onto it */
+  async saveChain({ token, chain = {} }) {
+    const { email, u } = await admin(token); if (!isOwner(u)) err('forbidden', 'سلسلة الاعتماد يتحكم بها مالك النظام فقط');
+    const st = await getJSON('settings', {}), c = Object.fromEntries(Object.keys(CHAIN_DEF).map((k) => [k, chain[k] !== undefined ? !!chain[k] : (st.chain || CHAIN_DEF)[k] !== false]));
+    st.chain = c; st.chainLog = (st.chainLog || []).concat([{ at: now(), by: u.name, email, chain: c }]).slice(-100); await setJSON('settings', st);
+    await logVisit(email, u.name, 'chain-settings', JSON.stringify(c)); return { chain: c };
+  },
+  async chainInflight({ token, apply, ids }) {
+    await loadData(false); const { email, u } = await admin(token); if (!isOwner(u)) err('forbidden', 'تطبيق السلسلة على الاستمارات الجارية لمالك النظام فقط');
+    const all = await evals(), out = [], want = Array.isArray(ids) ? new Set(ids.map(String)) : null, ts = now();
+    for (const r of Object.values(all)) {
+      const w = r.wf; if (!w || !['hr', 'ops', 'gm', 'ceo'].includes(w.stage) || w.sig.head) continue;
+      const h = await headFor(r); if (!h.email || h.skipped) continue;
+      out.push({ id: r.id, emp: r.emp, period: r.period, type: r.type, stage: w.stage, head: h, ev: r.ev.name });
+      if (apply && (!want || want.has(r.id))) {
+        const from = w.stage; w.head = h; w.stage = 'head'; for (const k of ['hr', 'ops', 'gm', 'ceo']) delete w.sig[k]; r.updated = ts;
+        logAct(r, { name: u.name, email, cap: capOf(u) }, 'chain_applied', { reason: 'تطبيق سلسلة الاعتماد الجديدة: تمر الاستمارة على مدير القسم ثم تُحال من جديد', stFrom: from, stTo: 'head' });
+      }
+    }
+    if (apply) { await setJSON('evals', all); await logVisit(email, u.name, 'chain-apply', String(want ? want.size : out.length)); }
+    return { items: out, applied: apply ? out.filter((x) => !want || want.has(x.id)).length : 0 };
+  },
   async saveFx({ token, rate }) {
     const { email, u } = await admin(token), x = Number(rate); if (!(x > 0 && x < 1e6)) err('invalid', 'سعر الصرف غير صالح');
     const s = await getJSON('settings', {}); const fx = { rate: rnd(x, 4), date: today(), at: now(), by: u.name, email };
@@ -860,7 +887,9 @@ const R = {
     const all = await getJSON('chreqs', {}); if (Object.values(all).some((c) => c.ref === ref && c.status.startsWith('pending'))) err('exists', 'يوجد طلب قيد الاعتماد على هذا السجل');
     const r = (await evals())[it.srcId]; if (!r) err('not_found', 'الاستمارة الأصلية غير موجودة');
     if (r.ev.email === email) err('forbidden', 'المقيّم لا يطلب تغيير سجل تقييمه');
-    const c = { id: '', ref, kind, reason, by: u.name, email, cap: capOf(u), at: now(), status: 'pending_gm', ceo: !!r.wf.ceo, sigs: [], log: [] };
+    const cfg = await chainCfg(), opsU = r.wf.ops && cfg.changeOps ? (await users())[r.wf.ops.email] : null;
+    const ops = opsU && opsU.role === 'ops' && opsU.active !== false && r.wf.ops.email !== email ? r.wf.ops : null;
+    const c = { id: '', ref, kind, reason, by: u.name, email, cap: capOf(u), at: now(), status: ops ? 'pending_ops' : 'pending_gm', ops, ceo: !!r.wf.ceo && cfg.ceo, sigs: [], log: [] };
     if (kind === 'correct') {
       const e = SEED.emps.find((x) => x[0] === r.emp.id) || [r.emp.id, r.emp.name, r.emp.code];
       const a = (rec && rec.a || r.a).map((v) => score(v, true)), b = (rec && rec.b || r.b).map((v) => score(v, false));
@@ -886,13 +915,14 @@ const R = {
     await loadData(false); const { email, u } = await auth(token), role = roleOf(u), all = await getJSON('chreqs', {}), c = all[id]; if (!c) err('not_found', 'الطلب غير موجود');
     note = String(note || '').slice(0, 600); const ts = now(), sig = cleanSig(img) || u.sig || '';
     if (act === 'withdraw') { if (c.email !== email || !c.status.startsWith('pending')) err('forbidden', 'يسحب الطلب من قدّمه قبل اعتماده'); c.status = 'withdrawn'; c.log.push({ at: ts, by: u.name, act, note }); await setJSON('chreqs', all); return { change: c }; }
-    const stage = c.status === 'pending_gm' ? 'gm' : c.status === 'pending_ceo' ? 'ceo' : ''; if (!stage) err('invalid', 'الطلب ليس قيد الاعتماد');
-    if (role !== stage) err('forbidden', 'الطلب بانتظار ' + (stage === 'gm' ? 'المدير العام' : 'الرئيس التنفيذي'));
+    const stage = { pending_ops: 'ops', pending_gm: 'gm', pending_ceo: 'ceo' }[c.status] || ''; if (!stage) err('invalid', 'الطلب ليس قيد الاعتماد');
+    if (role !== stage || (stage === 'ops' && c.ops.email !== email)) err('forbidden', 'الطلب بانتظار ' + ({ ops: 'مدير العمليات', gm: 'المدير العام', ceo: 'الرئيس التنفيذي' }[stage]));
     const evs = await evals(), r = evs[(await recIndex()).items[c.ref].srcId];
     if (email === c.email || email === r.ev.email || c.sigs.some((s) => s.email === email)) err('forbidden', 'فصل المهام: لا يعتمد الطلب من قدّمه أو من قيّم الموظف أو من وقّعه سابقاً');
     if (act === 'reject') { c.status = 'rejected'; c.log.push({ at: ts, by: u.name, act, note }); await setJSON('chreqs', all); return { change: c }; }
     if (act !== 'approve') err('bad_action', 'إجراء غير معروف'); if (!sig) err('invalid', 'التوقيع الإلكتروني مطلوب');
     c.sigs.push({ role: stage, name: u.name, title: u.title || '', email, at: ts, img: sig }); c.log.push({ at: ts, by: u.name, act: 'approve', note });
+    if (stage === 'ops') { c.status = 'pending_gm'; await setJSON('chreqs', all); return { change: c }; }
     if (stage === 'gm' && c.ceo) { c.status = 'pending_ceo'; await setJSON('chreqs', all); return { change: c }; }
     /* final approval: apply */
     const idx = await recIndex(), it = idx.items[c.ref]; if (it.status !== 'active') err('invalid', 'السجل لم يعد سارياً');
