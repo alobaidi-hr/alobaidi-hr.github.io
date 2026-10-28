@@ -227,7 +227,7 @@ function renderShell() {
   var u = S.user, b = S.brand || {};
   var AUD = role() === 'auditor';
   var nav = NAV.filter(function (g) { return !g[2] || isAdmin(); }).map(function (g) {
-    var items = g[1].filter(function (n) { return !(/^(gm|ceo)$/.test(role()) && /^(eval|self|mine)$/.test(n[0])) && !(n[0] === 'box' && isAdmin()) && !(n[0] === 'records' && !canRecords()) && !(AUD && !/^(home|records|jd|kpi|gov)$/.test(n[0])); });
+    var items = g[1].filter(function (n) { return !(/^(ops|gm|ceo)$/.test(role()) && /^(eval|self|mine)$/.test(n[0])) && !(n[0] === 'box' && isAdmin()) && !(n[0] === 'records' && !canRecords()) && !(AUD && !/^(home|records|jd|kpi|gov)$/.test(n[0])); });
     if (!items.length) return '';
     return (g[0] ? '<div class="grp">' + g[0] + '</div>' : '') + items.map(function (n) {
       return '<a class="nav" href="' + (n[3] || '#/' + n[0]) + '" data-r="' + n[0] + '">' + ic(n[1]) + '<span>' + n[2] + '</span>' + (n[0] === 'inbox' ? '<span class="badge" id="unread"' + (S.unread ? '' : ' hidden') + '>' + S.unread + '</span>' : '') + (n[0] === 'box' ? '<span class="badge" id="boxc"' + (S.boxUnread ? '' : ' hidden') + '>' + (S.boxUnread || 0) + '</span>' : '') + (n[0] === 'mine' ? '<span class="badge" id="minec">' + S.evals.length + '</span>' : '') + '</a>';
@@ -914,7 +914,7 @@ function drawBox(items) {
 VIEWS.box = function (v) {
   if (isAdmin()) { location.hash = '#/inbox'; return; }
   var R = role();
-  v.innerHTML = head('الوارد', { gm: 'التقييمات المرحّلة إليك من الموارد البشرية للاعتماد والمصادقة النهائية', ceo: 'الحالات الاستثنائية المرحّلة إليك للمصادقة', manager: 'كل ما يصلك: تقييمات أقسامك، التقييمات المُعادة إليك، التقييمات الذاتية للموظفين، وتحديثات الاعتماد' }[R] || '') + '<div id="bxl"><div class="loading" style="min-height:24vh"><div class="spin"></div></div></div>';
+  v.innerHTML = head('الوارد', { ops: 'التقييمات المحالة إليك لاعتماد مدير العمليات', gm: 'التقييمات المرحّلة إليك من الموارد البشرية للاعتماد والمصادقة النهائية', ceo: 'الحالات الاستثنائية المرحّلة إليك للمصادقة', manager: 'كل ما يصلك: تقييمات أقسامك، التقييمات المُعادة إليك، التقييمات الذاتية للموظفين، وتحديثات الاعتماد' }[R] || '') + '<div id="bxl"><div class="loading" style="min-height:24vh"><div class="spin"></div></div></div>';
   var load = function () { return api('myBox').then(function (r) { updBox(r.unread); drawBox(r.items); }).catch(function (e) { var b = $('#bxl'); if (b) b.innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; }); };
   load();
   v.onclick = function (e) {
@@ -1025,7 +1025,7 @@ function drawUsers() {
     '<div class="tw"><table class="t minw"><thead><tr><th>المستخدم</th><th>الصلاحية / الأقسام</th><th>الحالة</th><th>مرات الدخول</th><th>الصفحات</th><th>التقييمات</th><th>آخر دخول</th><th></th></tr></thead><tbody>' +
     u.map(function (x) {
       return '<tr><td><b>' + esc(x.name) + '</b><div class="muted num" style="font-size:12px;text-align:start">' + esc(x.email) + '</div><div class="muted" style="font-size:11.5px">' + esc(x.title) + '</div></td>' +
-        '<td>' + (x.role !== 'manager' && ROLE_AR[x.role] ? '<span class="pill r2">' + ROLE_AR[x.role] + '</span>' + (x.owner ? ' <span class="tag">مالك النظام</span>' : x.role === 'admin' && x.grants ? '<div class="muted" style="font-size:11.5px">' + ['recall', 'cancel', 'edit', 'exec'].filter(function (k) { return x.grants[k]; }).map(function (k) { return { recall: 'استرجاع', cancel: 'إلغاء', edit: 'تعديل', exec: 'تنفيذ' }[k]; }).join(' · ') + '</div>' : '') + (x.role === 'auditor' && x.scope && ((x.scope.companies || []).length || (x.scope.branches || []).length) ? '<div class="muted" style="font-size:11.5px">نطاق محدد</div>' : '') : esc((x.depts === 'ALL' ? [] : x.depts).map(deptName).join('، ')) + (x.allJD ? '<div class="muted" style="font-size:11.5px">يطّلع على كل الأوصاف</div>' : '') + (x.perms && x.perms.jd ? '<div class="muted" style="font-size:11.5px">✎ يعدّل الأوصاف</div>' : '') + (x.perms && x.perms.emp ? '<div class="muted" style="font-size:11.5px">✎ يعدّل الموظفين</div>' : '')) + '</td>' +
+        '<td>' + (x.role !== 'manager' && ROLE_AR[x.role] ? '<span class="pill r2">' + ROLE_AR[x.role] + '</span>' + (x.owner ? ' <span class="tag">مالك النظام</span>' : x.role === 'admin' && x.grants ? '<div class="muted" style="font-size:11.5px">' + ['recall', 'cancel', 'edit', 'exec'].filter(function (k) { return x.grants[k]; }).map(function (k) { return { recall: 'استرجاع', cancel: 'إلغاء', edit: 'تعديل', exec: 'تنفيذ' }[k]; }).join(' · ') + '</div>' : '') + (x.role === 'auditor' && x.scope && ((x.scope.companies || []).length || (x.scope.branches || []).length) ? '<div class="muted" style="font-size:11.5px">نطاق محدد</div>' : '') : esc((x.depts === 'ALL' ? [] : x.depts).map(deptName).join('، ')) + (x.allJD ? '<div class="muted" style="font-size:11.5px">يطّلع على كل الأوصاف</div>' : '') + ((x.heads || []).length ? '<div style="font-size:11.5px"><span class="tag">مدير قسم معتمد: ' + esc(x.heads.map(deptName).join('، ')) + '</span></div>' : '') + (x.perms && x.perms.jd ? '<div class="muted" style="font-size:11.5px">✎ يعدّل الأوصاف</div>' : '') + (x.perms && x.perms.emp ? '<div class="muted" style="font-size:11.5px">✎ يعدّل الموظفين</div>' : '')) + '</td>' +
         '<td>' + (!x.active ? '<span class="pill r0">موقوف</span>' : x.activated ? '<span class="pill r3">فعّال</span>' : '<span class="pill r1">بانتظار التفعيل</span><div class="num" style="font-weight:700;margin-top:3px">' + esc(x.code) + '</div>') + '</td>' +
         '<td class="num">' + x.logins + '</td><td class="num">' + x.actions + '</td><td class="num">' + x.evals + '</td><td class="num" style="font-size:12px">' + esc(x.lastLogin || '—') + '</td>' +
         '<td class="w"><div class="actions"><button class="btn sec sm" data-ed="' + esc(x.email) + '">تعديل</button>' + (x.code ? '<button class="btn sec sm" data-inv="' + esc(x.email) + '">نص الدعوة</button>' : '') + '<button class="btn sec sm" data-rs="' + esc(x.email) + '">رمز جديد</button></div></td></tr>';
@@ -1044,12 +1044,13 @@ function userForm(x) {
   modal('<div class="mbox narrow"><div class="card"><div class="hd"><h2>' + (isNew ? 'إضافة مستخدم' : 'تعديل المستخدم') + '</h2></div><div class="bd stack">' +
     '<label class="f">البريد الإلكتروني <span class="en">E-mail</span><input class="inp" id="ue" type="email" dir="ltr" value="' + esc(x.email) + '"' + (isNew ? '' : ' readonly') + '></label>' +
     '<div class="grid"><label class="f">الاسم<input class="inp" id="un" value="' + esc(x.name) + '"></label><label class="f">المنصب<input class="inp" id="ut" value="' + esc(x.title) + '"></label></div>' +
-    '<label class="f">الصلاحية<select class="inp" id="ur"><option value="manager">مدير قسم — يقيّم موظفي أقسامه</option><option value="admin">مدير النظام — صلاحية كاملة</option><option value="gm">المدير العام — الاعتماد والمصادقة النهائية</option><option value="ceo">الرئيس التنفيذي — المصادقة الاستثنائية</option><option value="auditor">المدقق الداخلي — سجل الموافقات للاطلاع والملاحظات</option></select></label>' +
+    '<label class="f">الصلاحية<select class="inp" id="ur"><option value="manager">مدير قسم — يقيّم موظفي أقسامه</option><option value="admin">مدير النظام — صلاحية كاملة</option><option value="ops">مدير العمليات — يعتمد بعد الموارد البشرية إذا حددته</option><option value="gm">المدير العام — الاعتماد والمصادقة النهائية</option><option value="ceo">الرئيس التنفيذي — المصادقة الاستثنائية</option><option value="auditor">المدقق الداخلي — سجل الموافقات للاطلاع والملاحظات</option></select></label>' +
     (S.user.owner ? '<div id="ugw"><div class="f" style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px">صلاحيات الموارد البشرية الحساسة (تُمنح كلٌّ على حدة)</div>' +
       [['owner', 'مالك النظام — كل الصلاحيات ومنحها للآخرين'], ['recall', 'استرجاع الاستمارة بعد إحالتها للمدير العام/الرئيس التنفيذي'], ['cancel', 'إلغاء الاستمارة وطلب إلغاء السجل المعتمد (بسبب إلزامي)'], ['edit', 'تعديل الدرجات والبيانات والتوصيات وطلب التصحيح (بسبب إلزامي)'], ['exec', 'تسجيل تنفيذ الأثر وعكسه وتسويته']].map(function (g) { return '<label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:4px"><input type="checkbox" data-g="' + g[0] + '"' + ((g[0] === 'owner' ? x.owner : x.grants && x.grants[g[0]] && !x.owner) ? ' checked' : '') + '>' + g[1] + '</label>'; }).join('') + '</div>' : '') +
     '<div id="usw"><div class="f" style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px">نطاق المدقق — اتركه فارغاً لكل الشركة</div><div class="checks">' + ((S.data.orgs || {}).companies || []).map(function (c) { return '<label><input type="checkbox" data-sc="' + esc(c.id) + '"' + (x.scope && (x.scope.companies || []).indexOf(c.id) >= 0 ? ' checked' : '') + '>' + esc(c.ar || c.en) + '</label>'; }).join('') + '</div>' +
     '<label class="f" style="margin-top:6px">الفروع (اسم الفرع كما في بيانات الموظفين، كل فرع بسطر)<textarea class="inp" id="usb" rows="2">' + esc(((x.scope && x.scope.branches) || []).join('\n')) + '</textarea></label></div>' +
     '<div id="udw"><div class="f" style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px">الأقسام المسؤول عنها — يرى أوصافها الوظيفية ومؤشراتها وموظفيها فقط ويقيّمهم</div><div class="checks">' + S.data.depts.map(function (d) { return '<label><input type="checkbox" value="' + d.no + '"' + (ds.indexOf(d.no) >= 0 ? ' checked' : '') + '>' + String(d.no).padStart(2, '0') + ' · ' + esc(d.ar) + '</label>'; }).join('') + '</div>' +
+    '<div class="f" style="font-size:12px;font-weight:600;color:var(--muted);margin:10px 0 4px">مدير القسم المعتمد — يعتمد تقييمات القسم بعد توقيع الموظف (مدير واحد لكل قسم)</div><div class="checks" id="uhd">' + S.data.depts.map(function (d) { var other = (S.data.heads || {})[d.no]; var mine = (x.heads || []).indexOf(d.no) >= 0; return '<label' + (other && !mine ? ' title="المدير الحالي: ' + esc(other) + '"' : '') + '><input type="checkbox" data-hd="' + d.no + '"' + (mine ? ' checked' : '') + '>' + String(d.no).padStart(2, '0') + ' · ' + esc(d.ar) + (other && !mine ? ' <span class="muted" style="font-size:11px">(' + esc(other) + ')</span>' : '') + '</label>'; }).join('') + '</div>' +
     '<label style="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:13px"><input type="checkbox" id="uj"' + (x.allJD ? ' checked' : '') + '>استثناء: يطّلع على الأوصاف الوظيفية لكل الأقسام (للاطلاع فقط — اتركه فارغاً ليبقى على قسمه)</label>' +
     '<div class="f" style="font-size:12px;font-weight:600;color:var(--muted);margin:10px 0 4px">صلاحيات التعديل (ضمن أقسامه فقط)</div>' +
     '<label style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" id="upj"' + (x.perms && x.perms.jd ? ' checked' : '') + '>تعديل الأوصاف الوظيفية ومؤشرات الأداء وإضافتها</label>' +
@@ -1061,6 +1062,8 @@ function userForm(x) {
   $('#us').onclick = function () {
     var d = { email: $('#ue').value.trim(), name: $('#un').value.trim(), title: $('#ut').value.trim(), role: $('#ur').value, allJD: $('#uj').checked, active: $('#ua').checked,
       depts: $$('#udw .checks input:checked').map(function (c) { return +c.value; }), perms: { jd: $('#upj').checked, emp: $('#upe').checked } };
+    d.heads = $$('[data-hd]').filter(function (c) { return c.checked; }).map(function (c) { return +c.dataset.hd; }).filter(function (n) { return d.depts.indexOf(n) >= 0; });
+    if ($('[data-hd]:checked') && d.heads.length !== $$('[data-hd]').filter(function (c) { return c.checked; }).length) { $('#um').className = 'msg err'; $('#um').textContent = 'مدير القسم يجب أن يكون من الأقسام المسؤول عنها أعلاه'; return; }
     if ($('#ugw')) { d.owner = $('[data-g="owner"]').checked; d.grants = {}; $$('[data-g]').forEach(function (c) { if (c.dataset.g !== 'owner') d.grants[c.dataset.g] = c.checked; }); }
     d.scope = { companies: $$('[data-sc]').filter(function (c) { return c.checked; }).map(function (c) { return c.dataset.sc; }), branches: $('#usb').value.split(/\n+/).map(function (t) { return t.trim(); }).filter(Boolean) };
     if (!d.name) { $('#um').className = 'msg err'; $('#um').textContent = 'اكتب الاسم'; return; }
@@ -1386,8 +1389,9 @@ VIEWS.trash = function (v) {
 
 
 /* ---------------------------------------------------------------- e-signature + approval workflow */
-var WFS = { employee: ['بانتظار توقيع الموظف', 'r1'], hr: ['مراجعة الموارد البشرية', 'r1'], gm: ['عند المدير العام', 'r2'], ceo: ['عند الرئيس التنفيذي', 'r2'], returned: ['مُعاد للمقيّم', 'r0'], done: ['معتمد نهائياً', 'r3'], cancelled: ['ملغاة', 'rx'] };
-var ROLE_AR = { admin: 'مدير النظام', manager: 'مدير قسم', gm: 'المدير العام', ceo: 'الرئيس التنفيذي', auditor: 'المدقق الداخلي' };
+var SIGROLE = { mgr: 'المقيّم', emp: 'الموظف', head: 'مدير القسم', hr: 'الموارد البشرية', ops: 'مدير العمليات', gm: 'المدير العام', ceo: 'الرئيس التنفيذي' };
+var WFS = { employee: ['بانتظار توقيع الموظف', 'r1'], head: ['عند مدير القسم', 'r1'], hr: ['مراجعة الموارد البشرية', 'r1'], ops: ['عند مدير العمليات', 'r2'], gm: ['عند المدير العام', 'r2'], ceo: ['عند الرئيس التنفيذي', 'r2'], returned: ['مُعاد للمقيّم', 'r0'], done: ['معتمد نهائياً', 'r3'], cancelled: ['ملغاة', 'rx'] };
+var ROLE_AR = { admin: 'مدير النظام', manager: 'مدير قسم', ops: 'مدير العمليات', gm: 'المدير العام', ceo: 'الرئيس التنفيذي', auditor: 'المدقق الداخلي' };
 function role() { return (S.user && S.user.role) || 'manager'; }
 function wfTag(r) { if (!r.wf) return ''; var w = WFS[r.wf.stage] || ['', 'rx']; return '<div><span class="pill ' + w[1] + '" style="font-size:10.5px">' + w[0] + '</span>' + (r.wf.ceo && r.wf.stage !== 'done' ? ' <span class="tag" title="تتطلب مصادقة الرئيس التنفيذي">+ر.ت</span>' : '') + '</div>'; }
 var SIG_FONTS = [['Great Vibes', 54], ['Allura', 58], ['Dancing Script', 46], ['Sacramento', 58], ['Alex Brush', 52]];
@@ -1482,26 +1486,31 @@ function ackLink(r) { return location.href.split('#')[0].replace(/\?.*$/, '') + 
 function ackShare(r) {
   var url = ackLink(r), co = (S.brand || {}).company_ar || 'شركة الليث العبيدي';
   var msg = 'السلام عليكم ' + r.emp.name + '،\n\nتم إكمال تقييم أدائك (' + TYPE[r.type][1] + ' — ' + r.period + ') في ' + co + '. يرجى الاطلاع عليه وكتابة ملاحظاتك والتوقيع إلكترونياً من الرابط:\n' + url + '\n\nمع التحية،\n' + S.user.name;
-  modal('<div class="mbox narrow"><div class="card"><div class="hd"><h2>توقيع الموظف — ' + esc(r.emp.name) + '</h2></div><div class="bd stack"><div class="note">بعد توقيع الموظف ينتقل التقييم تلقائياً إلى مراجعة الموارد البشرية، ثم يُرحَّل إلى المدير العام للاعتماد النهائي.</div>' +
+  modal('<div class="mbox narrow"><div class="card"><div class="hd"><h2>توقيع الموظف — ' + esc(r.emp.name) + '</h2></div><div class="bd stack"><div class="note">بعد توقيع الموظف ينتقل التقييم تلقائياً إلى مدير القسم، ثم الموارد البشرية، ثم مدير العمليات (إذا حددته الموارد البشرية)، ثم المدير العام، ثم الرئيس التنفيذي عند الحاجة.</div>' +
     '<label class="f">الرابط الخاص بالموظف<input class="inp" dir="ltr" readonly value="' + esc(url) + '"></label><label class="f">نص الرسالة<textarea class="inp" rows="6" readonly id="ak_tx">' + esc(msg) + '</textarea></label>' +
     '<div class="actions"><button class="btn pri" id="ak_cp">نسخ الرسالة</button><a class="btn sec" target="_blank" rel="noopener" href="https://wa.me/?text=' + encodeURIComponent(msg) + '">واتساب</a><a class="btn sec" href="mailto:?subject=' + encodeURIComponent('تقييم الأداء — ' + r.period) + '&body=' + encodeURIComponent(msg) + '">بريد</a><button class="btn sec" data-close>إغلاق</button></div></div></div></div>');
   $('#ak_cp').onclick = function () { var t = $('#ak_tx'); t.select(); try { navigator.clipboard.writeText(t.value).then(function () { toast('نُسخت الرسالة'); }, function () { document.execCommand('copy'); toast('نُسخت الرسالة'); }); } catch (e) { document.execCommand('copy'); toast('نُسخت الرسالة'); } };
 }
 function wfSteps(r) {
   var w = r.wf, sg = (w && w.sig) || {}, st = w ? w.stage : '';
-  var order = ['mgr', 'emp', 'hr', 'gm'].concat(w && w.ceo ? ['ceo'] : []);
-  var cur = { employee: 'emp', hr: 'hr', gm: 'gm', ceo: 'ceo', returned: 'mgr' }[st];
-  var lbl = { mgr: 'المقيّم', emp: 'الموظف', hr: 'الموارد البشرية', gm: 'المدير العام', ceo: 'الرئيس التنفيذي' };
-  return '<div class="wfsteps">' + order.map(function (k, i) { var done = sg[k] && (sg[k].img || sg[k].paper), on = k === cur; return '<div class="wfs' + (done ? ' done' : '') + (on ? ' on' : '') + '"><i>' + (done ? '✓' : i + 1) + '</i><b>' + lbl[k] + '</b><span>' + (done ? '<bdi dir="ltr" class="num">' + esc(sigDate(sg[k].at)) + '</bdi>' + (sg[k].paper ? ' · ورقي' : '') : on ? 'الآن' : '—') + '</span></div>'; }).join('') + '</div>';
+  var hasHead = w && w.head && w.head.email && !w.head.skipped;
+  var order = ['mgr', 'emp'].concat(hasHead ? ['head'] : []).concat(['hr']).concat(w && w.ops ? ['ops'] : []).concat(['gm']).concat(w && w.ceo ? ['ceo'] : []);
+  var cur = { employee: 'emp', head: 'head', hr: 'hr', ops: 'ops', gm: 'gm', ceo: 'ceo', returned: 'mgr' }[st];
+  var who = { head: hasHead && w.head.name, ops: w && w.ops && w.ops.name };
+  return '<div class="wfsteps">' + order.map(function (k, i) { var done = sg[k] && (sg[k].img || sg[k].paper), on = k === cur; return '<div class="wfs' + (done ? ' done' : '') + (on ? ' on' : '') + '"><i>' + (done ? '✓' : i + 1) + '</i><b>' + SIGROLE[k] + '</b><span>' + (done ? '<bdi dir="ltr" class="num">' + esc(sigDate(sg[k].at)) + '</bdi>' + (sg[k].paper ? ' · ورقي' : '') : on ? 'الآن' : '—') + (who[k] ? '<br>' + esc(who[k]) : '') + '</span></div>'; }).join('') + '</div>' +
+    (w && w.head && w.head.skipped ? '<div class="muted" style="font-size:11.5px">' + (w.head.skipped === 'self' ? 'خطوة مدير القسم مدمجة: المقيّم هو مدير القسم نفسه.' : 'لا يوجد مدير قسم معتمد لهذا القسم — تنتقل الاستمارة من الموظف إلى الموارد البشرية مباشرة (يُحدَّد من «المستخدمون»).') + '</div>' : '');
 }
 function wfPanel(rec) {
-  if (!rec.wf) return isAdmin() ? '<div class="wfp"><div class="muted" style="font-size:12.5px">تقييم سابق لدورة الاعتماد الإلكتروني.</div><button class="btn sec sm" data-wf="hr_forward">' + ic('up') + 'توقيع الموارد البشرية وترحيله للمدير العام</button></div>' : '';
-  var w = rec.wf, st = w.stage, R = role(), h = '<div class="wfp">' + wfSteps(rec) + '<div class="wfrow"><span class="pill ' + WFS[st][1] + '">' + WFS[st][0] + '</span>' + (w.ceo ? '<span class="tag">تتطلب مصادقة الرئيس التنفيذي</span>' : '') + '<span class="grow"></span>';
+  if (!rec.wf) return '';
+  var w = rec.wf, st = w.stage, R = role(), me = S.user.email, h = '<div class="wfp">' + wfSteps(rec) + '<div class="wfrow"><span class="pill ' + WFS[st][1] + '">' + WFS[st][0] + '</span>' + (w.ops ? '<span class="tag">مدير العمليات: ' + esc(w.ops.name) + '</span>' : '') + (w.ceo ? '<span class="tag">تتطلب مصادقة الرئيس التنفيذي</span>' : '') + '<span class="grow"></span>';
   var last = (w.log || []).filter(function (l) { return l.note; }).slice(-1)[0];
-  if (st === 'employee' && (R === 'admin' || rec.ev.email === S.user.email)) h += '<button class="btn sec sm" data-wf="share">' + ic('link') + 'رابط توقيع الموظف</button>';
-  if (R === 'admin' && (st === 'hr' || st === 'employee')) h += '<button class="btn pri sm" data-wf="hr_forward">' + ic('up') + 'مراجعة وترحيل إلى المدير العام</button><button class="btn sec sm" data-wf="hr_return">إعادة للمقيّم</button>';
-  if (R === 'admin' && /^(employee|hr|gm)$/.test(st)) h += '<label class="chk ceotog"><input type="checkbox" data-wf="set_ceo"' + (w.ceo ? ' checked' : '') + '> حالة استثنائية — إضافة مصادقة الرئيس التنفيذي للاستمارة</label>';
   if (st === 'cancelled') return h + '</div></div>';
+  if (st === 'employee' && (R === 'admin' || rec.ev.email === me)) h += '<button class="btn sec sm" data-wf="share">' + ic('link') + 'رابط توقيع الموظف</button>';
+  if (st === 'employee' && R === 'admin') h += '<button class="btn sec sm" data-wf="paper_ack">تسجيل توقيع ورقي للموظف</button>';
+  if (st === 'head' && R === 'manager' && w.head && w.head.email === me) h += '<button class="btn pri sm" data-wf="head_approve">' + ic('check') + 'اعتماد مدير القسم</button><button class="btn sec sm" data-wf="head_return">إعادة للمقيّم</button>';
+  if (R === 'admin' && st === 'hr') h += '<button class="btn pri sm" data-wf="hr_forward">' + ic('up') + 'مراجعة الموارد البشرية والإحالة</button><button class="btn sec sm" data-wf="hr_return">إعادة للمقيّم</button>';
+  if (R === 'admin' && /^(employee|head|hr)$/.test(st)) h += '<label class="chk ceotog"><input type="checkbox" data-wf="set_ceo"' + (w.ceo ? ' checked' : '') + '> حالة استثنائية — إضافة مصادقة الرئيس التنفيذي للاستمارة</label>';
+  if (R === 'ops' && st === 'ops' && w.ops && w.ops.email === me) h += '<button class="btn pri sm" data-wf="ops_approve">' + ic('check') + 'اعتماد مدير العمليات</button><button class="btn sec sm" data-wf="ops_return">إعادة للموارد البشرية</button>';
   if (R === 'gm' && st === 'gm') h += '<button class="btn pri sm" data-wf="gm_approve">' + ic('check') + 'الاعتماد والمصادقة النهائية</button><button class="btn sec sm" data-wf="gm_return">إعادة للموارد البشرية</button>';
   if (R === 'ceo' && st === 'ceo') h += '<button class="btn pri sm" data-wf="ceo_approve">' + ic('check') + 'مصادقة الرئيس التنفيذي</button><button class="btn sec sm" data-wf="ceo_return">إعادة للموارد البشرية</button>';
   return h + '</div>' + (last ? '<div class="muted" style="font-size:12px">آخر ملاحظة: ' + esc(last.note) + ' — ' + esc(last.by) + '</div>' : '') + '</div>';
@@ -1511,29 +1520,34 @@ function wfBind(rec, admin) {
   box.onclick = function (e) {
     var b = e.target.closest('button[data-wf]'); if (!b) return; var act = b.dataset.wf;
     if (act === 'share') return ackShare(rec);
-    var done = function (r) { Object.assign(rec, r.eval); [S.inbox, S.evals, S.appr].forEach(function (l) { (l || []).forEach(function (x) { if (x.id === rec.id) Object.assign(x, r.eval); }); }); toast({ hr_forward: 'رُحّل التقييم إلى المدير العام', gm_approve: rec.wf.stage === 'ceo' ? 'اعتُمد — رُحّل إلى الرئيس التنفيذي' : 'تم الاعتماد النهائي', ceo_approve: 'تمت مصادقة الرئيس التنفيذي', hr_return: 'أُعيد للمقيّم', gm_return: 'أُعيد للموارد البشرية', ceo_return: 'أُعيد للموارد البشرية' }[act] || 'تم'); openEval(rec, admin); };
+    var done = function (r) { Object.assign(rec, r.eval); [S.inbox, S.evals, S.appr].forEach(function (l) { (l || []).forEach(function (x) { if (x.id === rec.id) Object.assign(x, r.eval); }); }); toast({ hr_forward: rec.wf.stage === 'ops' ? 'أُحيل التقييم إلى مدير العمليات' : 'أُحيل التقييم إلى المدير العام', paper_ack: rec.wf.stage === 'head' ? 'سُجّل التوقيع الورقي — الاستمارة عند مدير القسم' : 'سُجّل التوقيع الورقي', head_approve: 'اعتُمد — الاستمارة عند الموارد البشرية', ops_approve: 'اعتُمد — الاستمارة عند المدير العام', head_return: 'أُعيد للمقيّم', ops_return: 'أُعيد للموارد البشرية', gm_approve: rec.wf.stage === 'ceo' ? 'اعتُمد — رُحّل إلى الرئيس التنفيذي' : 'تم الاعتماد النهائي', ceo_approve: 'تمت مصادقة الرئيس التنفيذي', hr_return: 'أُعيد للمقيّم', gm_return: 'أُعيد للموارد البشرية', ceo_return: 'أُعيد للموارد البشرية' }[act] || 'تم'); openEval(rec, admin); };
     var fail = function (er) { toast(er.message); openEval(rec, admin); };
+    if (act === 'paper_ack') return twoClick(b, 'تأكيد: الموظف وقّع ورقياً؟', function () { api('wfAction', { id: rec.id, act: act }).then(function () { return api('getEval', { id: rec.id }); }).then(done).catch(fail); });
     if (/_return$/.test(act)) {
       modal('<div class="mbox narrow"><div class="card"><div class="hd"><h2>إعادة التقييم</h2></div><div class="bd stack"><label class="f">سبب الإعادة<textarea class="inp" id="rt_n" rows="3"></textarea></label><div class="actions"><button class="btn danger" id="rt_go">إعادة</button><button class="btn sec" id="rt_no">إلغاء</button></div></div></div></div>');
       $('#rt_no').onclick = function () { openEval(rec, admin); };
       $('#rt_go').onclick = function () { api('wfAction', { id: rec.id, act: act, note: $('#rt_n').value }).then(done).catch(fail); };
       return;
     }
-    var extra = act === 'hr_forward' ? '<label class="chk"><input type="checkbox" data-x="ceo"' + (rec.wf && rec.wf.ceo ? ' checked' : '') + '> حالة استثنائية — تتطلب مصادقة الرئيس التنفيذي بعد المدير العام</label>' + (rec.wf && rec.wf.stage === 'employee' ? '<div class="note warn">الموظف لم يوقّع إلكترونياً بعد — الترحيل يعني اعتماد توقيعه الورقي.</div>' : '') + '<label class="f">ملاحظة (اختيارية)<input class="inp" data-x="note"></label>'
+    var ou = (S.data.opsUsers || []);
+    var extra = act === 'hr_forward' ? '<div class="note">مسار الاعتماد بعد الموارد البشرية: ' + (ou.length ? 'مدير العمليات (إذا حددته) ← ' : '') + 'المدير العام ← الرئيس التنفيذي (إذا لزم).</div>' +
+      '<label class="f">مدير العمليات <span class="en">Operations manager</span><select class="inp" data-x="ops"><option value="">— لا تحتاج اعتماد مدير العمليات —</option>' + ou.map(function (o) { return '<option value="' + esc(o.email) + '"' + (rec.wf && rec.wf.ops && rec.wf.ops.email === o.email ? ' selected' : '') + '>' + esc(o.name) + (o.title ? ' — ' + esc(o.title) : '') + '</option>'; }).join('') + '</select>' + (ou.length ? '' : '<span class="muted" style="font-size:11.5px">لا يوجد حساب بدور «مدير العمليات» — أضفه من المستخدمين.</span>') + '</label>' +
+      '<label class="chk"><input type="checkbox" data-x="ceo"' + (rec.wf && rec.wf.ceo ? ' checked' : '') + '> حالة استثنائية — تتطلب مصادقة الرئيس التنفيذي بعد المدير العام</label><label class="f">ملاحظة (اختيارية)<input class="inp" data-x="note"></label>'
       : '<label class="f">ملاحظة (اختيارية)<input class="inp" data-x="note"></label>';
-    var t = { hr_forward: 'توقيع الموارد البشرية والترحيل', gm_approve: 'اعتماد ومصادقة المدير العام', ceo_approve: 'مصادقة الرئيس التنفيذي' }[act];
+    var t = { hr_forward: 'توقيع الموارد البشرية والإحالة', head_approve: 'اعتماد مدير القسم', ops_approve: 'اعتماد مدير العمليات', gm_approve: 'اعتماد ومصادقة المدير العام', ceo_approve: 'مصادقة الرئيس التنفيذي' }[act];
     if (/_approve$/.test(act)) extra = '<div class="note">تعتمد <b>النسخة ' + (rec.v || 1) + '</b> (الجولة ' + ((rec.wf && rec.wf.round) || 0) + ')' + (hrChanges(rec).length ? ' — فيها تعديلات من الموارد البشرية/المالك، راجعها في قسم الملاحظات والتعديلات' : '') + '. إذا تغيّرت الاستمارة بعد فتحها يُرفض الاعتماد.</div>' + extra;
-    askSign(t, 'التوقيع الإلكتروني يُثبَّت على الاستمارة باسمك وتاريخ التوقيع', extra).then(function (s) { if (!s) return openEval(rec, admin); api('wfAction', { id: rec.id, act: act, img: s.img, note: s.x.note || '', ceo: !!s.x.ceo, v: rec.v, round: rec.wf && rec.wf.round }).then(done).catch(fail); });
+    askSign(t, 'التوقيع الإلكتروني يُثبَّت على الاستمارة باسمك وتاريخ التوقيع', extra).then(function (s) { if (!s) return openEval(rec, admin); api('wfAction', { id: rec.id, act: act, img: s.img, note: s.x.note || '', ceo: !!s.x.ceo, ops: s.x.ops || '', v: rec.v, round: rec.wf && rec.wf.round }).then(done).catch(fail); });
   };
   box.onchange = function (e) { var c = e.target.closest('input[data-wf="set_ceo"]'); if (!c) return; api('wfAction', { id: rec.id, act: 'set_ceo', ceo: c.checked }).then(function (r) { Object.assign(rec, r.eval); [S.inbox, S.evals, S.appr].forEach(function (l) { (l || []).forEach(function (x) { if (x.id === rec.id) Object.assign(x, r.eval); }); }); toast(c.checked ? 'أُضيفت بطاقة توقيع الرئيس التنفيذي للاستمارة' : 'أُزيلت بطاقة توقيع الرئيس التنفيذي من الاستمارة'); var m0 = $('#modal'), y = m0 ? m0.scrollTop : 0; openEval(rec, admin); var m1 = $('#modal'); if (m1) m1.scrollTop = y; }).catch(function (er) { c.checked = !c.checked; toast(er.message); }); };
 }
 VIEWS.approvals = function (v) {
   var R = role();
-  v.innerHTML = head('الاعتمادات', { admin: 'التقييمات قيد دورة الاعتماد — المراجعة والترحيل إلى المدير العام', gm: 'التقييمات المرحّلة إليك للاعتماد والمصادقة النهائية', ceo: 'الحالات الاستثنائية المرحّلة لمصادقتك', manager: 'مسار اعتماد تقييماتك' }[R]) + '<div id="apx"><div class="loading" style="min-height:24vh"><div class="spin"></div></div></div>';
-  var mine = { admin: ['hr', 'employee'], gm: ['gm'], ceo: ['ceo'], manager: ['returned'] }[R] || [];
+  v.innerHTML = head('الاعتمادات', { ops: 'التقييمات المحالة إليك من الموارد البشرية لاعتماد مدير العمليات', admin: 'التقييمات قيد دورة الاعتماد — المراجعة والإحالة', gm: 'التقييمات المرحّلة إليك للاعتماد والمصادقة النهائية', ceo: 'الحالات الاستثنائية المرحّلة لمصادقتك', manager: 'مسار اعتماد تقييماتك' }[R]) + '<div id="apx"><div class="loading" style="min-height:24vh"><div class="spin"></div></div></div>';
+  var mine = { admin: ['hr', 'employee'], ops: ['ops'], gm: ['gm'], ceo: ['ceo'] }[R] || [], me = S.user.email;
+  var waits = function (x) { return R === 'manager' ? (x.wf.stage === 'returned' && x.ev.email === me) || (x.wf.stage === 'head' && x.wf.head && x.wf.head.email === me) : mine.indexOf(x.wf.stage) >= 0; };
   api('listApprovals').then(function (r) {
     S.appr = r.evals; var box = $('#apx'); if (!box) return;
-    var wait = r.evals.filter(function (x) { return mine.indexOf(x.wf.stage) >= 0; }), rest = r.evals.filter(function (x) { return mine.indexOf(x.wf.stage) < 0; });
+    var wait = r.evals.filter(waits), rest = r.evals.filter(function (x) { return !waits(x); });
     var tbl = function (l) { return '<div class="tw"><table class="t minw"><thead><tr><th>التاريخ</th><th>الموظف</th><th>القسم</th><th>المقيِّم</th><th>النوع / السبب</th><th>النهائية</th><th>المرحلة</th></tr></thead><tbody>' + l.map(function (x) { return '<tr class="click" data-ev="' + esc(x.id) + '"><td class="num">' + esc(x.updated.slice(0, 10)) + '</td><td><b>' + esc(x.emp.name) + '</b><div class="num muted" style="font-size:11px">' + esc(x.emp.id) + '</div></td><td>' + esc(deptName(x.emp.dept)) + '</td><td>' + esc(x.ev.name) + '</td><td>' + TYPE[x.type][1] + ' <span class="num muted">' + esc(x.period) + '</span>' + ppTag(x.pp) + '</td><td class="num"><b>' + x.F.toFixed(1) + '</b> <span class="pill r' + x.r + '">' + RATES[x.r][0] + '</span></td><td>' + wfTag(x) + '</td></tr>'; }).join('') + '</tbody></table></div>'; };
     box.innerHTML = '<div class="kpis" style="margin-bottom:14px">' + kpiTile(wait.length, 'بانتظار إجرائك', true) + kpiTile(r.evals.length, 'ضمن مسار الاعتماد') + '</div>' +
       '<h3 style="margin:6px 0">بانتظار إجرائك</h3>' + (wait.length ? tbl(wait) : '<div class="empty">لا يوجد ما ينتظرك حالياً</div>') + (rest.length ? '<h3 style="margin:18px 0 6px">البقية</h3>' + tbl(rest) : '');
@@ -1613,7 +1627,7 @@ function b64bytes(d) { var s = atob(String(d).split(',')[1] || ''), u = new Uint
 function imgSize(d) { return new Promise(function (res) { var i = new Image(); i.onload = function () { res([i.width, i.height]); }; i.onerror = function () { res([1, 1]); }; i.src = d; }); }
 function paperDOCX(r) {
   toast('جارٍ إنشاء ملف Word…');
-  var sigs = r.wf ? r.wf.sig : {}, imgs = [shieldSrc(), (window.LO_IMG && LO_IMG.wordmark) || ''].concat(['emp', 'mgr', 'hr', 'gm', 'ceo'].map(function (k) { return sigs[k] && sigs[k].img || ''; }));
+  var sigs = r.wf ? r.wf.sig : {}, imgs = [shieldSrc(), (window.LO_IMG && LO_IMG.wordmark) || ''].concat(['emp', 'mgr', 'hr', 'gm', 'ceo', 'head', 'ops'].map(function (k) { return sigs[k] && sigs[k].img || ''; }));
   return loadScript(VENDOR + 'docx.min.js').then(function () { return Promise.all(imgs.map(function (d) { return d && d.indexOf('data:') === 0 ? imgSize(d) : Promise.resolve(null); })); }).then(function (sz) {
     var D = window.docx, F = 'Arial', NAVY = '231D2B', ORG = 'E15532', SOFT = 'F6F1EC', LINE = 'D9D2CC';
     var j0 = JOB[r.emp.code] || { ar: r.emp.code, en: '', b: { kpis: [] } }, kp = r.k || j0.b.kpis, crit = r.cw || S.data.crit, d = DEPT[r.emp.dept] || {}, t = TYPE[r.type], pp = r.pp || { k: 'periodic' }, sf = PAPER_SELF && r.self && r.self.a && r.self.a.length === kp.length ? r.self : null;
@@ -1657,8 +1671,11 @@ function paperDOCX(r) {
     body.push(band('الملاحظات', 'COMMENTS'));
     body.push(table([{ cells: [H('نقاط القوة'), { v: r.n.s || '—' }, H('مجالات التحسين'), { v: r.n.d || '—' }] }, { cells: [H('الاحتياجات التدريبية'), { v: r.n.t || '—' }, H('أهداف الفترة القادمة'), { v: r.n.g || '—' }] }, { cells: [H('ملاحظات الموظف'), { v: r.n.e || '—', span: 3 }] }], [15, 35, 15, 35]));
     body.push(band('التواقيع وسلسلة الاعتماد', 'SIGNATURES & APPROVAL CHAIN'));
-    var chain = [['emp', 'الموظف (اطّلعت)', r.emp.name], ['mgr', 'المقيِّم / المدير المباشر', r.ev.name], ['hr', 'مراجعة الموارد البشرية', (sigs.hr && sigs.hr.name) || 'أوس فراس الشلال'], ['gm', 'الاعتماد — المدير العام', sigs.gm && sigs.gm.name]].concat(r.wf && r.wf.ceo ? [['ceo', 'مصادقة الرئيس التنفيذي', sigs.ceo && sigs.ceo.name]] : []);
-    var ki = { emp: 2, mgr: 3, hr: 4, gm: 5, ceo: 6 };
+    var chain = [['mgr', 'المقيِّم', r.ev.name], ['emp', 'الموظف (اطّلع ووقّع)', r.emp.name], ['hr', 'مراجعة الموارد البشرية', (sigs.hr && sigs.hr.name) || 'أوس فراس الشلال'], ['gm', 'الاعتماد — المدير العام', sigs.gm && sigs.gm.name]].concat(r.wf && r.wf.ceo ? [['ceo', 'مصادقة الرئيس التنفيذي', sigs.ceo && sigs.ceo.name]] : []);
+    var wf0 = r.wf || {};
+    if (sigs.head || (wf0.head && wf0.head.email && !wf0.head.skipped)) chain.splice(2, 0, ['head', 'مدير القسم', (sigs.head && sigs.head.name) || wf0.head.name]);
+    if (sigs.ops || wf0.ops) chain.splice(chain.findIndex(function (c) { return c[0] === 'gm'; }), 0, ['ops', 'مدير العمليات', (sigs.ops && sigs.ops.name) || wf0.ops.name]);
+    var ki = { emp: 2, mgr: 3, hr: 4, gm: 5, ceo: 6, head: 7, ops: 8 };
     body.push(table([{ cells: chain.map(function (c, i) { return H((i + 1) + ' · ' + c[1]); }) }, { cells: chain.map(function (c) { var s = sigs[c[0]], im = s && s.img ? pic(ki[c[0]], 34) : null; return { v: [P(im ? [im] : [run(s && s.paper ? 'توقيع ورقي' : ' ')], { al: D.AlignmentType.CENTER, sb: 40 }), P(run(c[2] || '', { b: true, size: 15 }), { al: D.AlignmentType.CENTER }), P(run(s && s.at ? (s.paper ? 'توقيع ورقي' : 'موقّع إلكترونياً') : 'التوقيع والتاريخ', { size: 13, c: '6B6470' }), { al: D.AlignmentType.CENTER }), P(run(s && s.at ? 'التاريخ: \u2066' + sigDate(s.at) + '\u2069' : ' ', { b: true, size: 14 }), { al: D.AlignmentType.CENTER })] }; }) }]));
     var header = new D.Header({ children: [new D.Table({ visuallyRightToLeft: true, width: { size: 100, type: D.WidthType.PERCENTAGE }, borders: D.TableBorders.NONE, rows: [new D.TableRow({ children: [
       new D.TableCell({ width: { size: 50, type: D.WidthType.PERCENTAGE }, borders: { top: { style: D.BorderStyle.NONE }, bottom: { style: D.BorderStyle.NONE }, left: { style: D.BorderStyle.NONE }, right: { style: D.BorderStyle.NONE } }, children: [P([pic(0, 46), run('  ')].concat(pic(1, 26) ? [pic(1, 26)] : []).filter(Boolean))] }),
@@ -1718,10 +1735,13 @@ function sigBoxes(list) {
 }
 function wfSigChain(r) {
   var g = r.wf.sig || {}, vn = function (s) { return s && s.v && r.v && s.v !== r.v ? '<br><span class="en">على النسخة ' + s.v + '</span>' : ''; }, ln = function (s) { return s && s.img ? 'موقّع إلكترونياً<br><b>التاريخ: <bdi dir="ltr" class="num">' + esc(sigDate(s.at)) + '</bdi></b>' + vn(s) : s && s.paper ? 'توقيع ورقي<br><b>التاريخ: <bdi dir="ltr" class="num">' + esc(sigDate(s.at)) + '</bdi></b>' + vn(s) : ''; };
-  var l = [['الموظف (اطّلعت)', 'Employee — acknowledged', r.emp.name, r.emp.id, ln(g.emp), g.emp && g.emp.img],
-    ['المقيِّم / المدير المباشر', 'Evaluator / direct manager', r.ev.name, r.ev.title, ln(g.mgr), g.mgr && g.mgr.img],
+  var l = [['المقيِّم', 'Evaluator', r.ev.name, r.ev.title, ln(g.mgr), g.mgr && g.mgr.img],
+    ['الموظف (اطّلع ووقّع)', 'Employee — acknowledged', r.emp.name, r.emp.id, ln(g.emp), g.emp && g.emp.img],
     ['مراجعة الموارد البشرية', 'HR review', (g.hr && g.hr.name) || 'أوس فراس الشلال', (g.hr && g.hr.title) || 'مدير الموارد البشرية', ln(g.hr), g.hr && g.hr.img],
     ['الاعتماد والمصادقة — المدير العام', 'Final approval — General Manager', g.gm && g.gm.name, g.gm && g.gm.title, ln(g.gm), g.gm && g.gm.img]];
+  var w = r.wf, hd = w.head && w.head.email && !w.head.skipped;
+  if (hd || g.head) l.splice(2, 0, ['المدير المباشر / مدير القسم', 'Direct manager / Head of department', (g.head && g.head.name) || w.head.name, (g.head && g.head.title) || (w.head && w.head.title), ln(g.head), g.head && g.head.img]);
+  if (w.ops || g.ops) l.splice(l.length - 1, 0, ['مدير العمليات', 'Operations Manager', (g.ops && g.ops.name) || w.ops.name, (g.ops && g.ops.title) || w.ops.title, ln(g.ops), g.ops && g.ops.img]);
   if (r.wf.ceo) l.push(['مصادقة الرئيس التنفيذي', 'CEO certification (exceptional)', g.ceo && g.ceo.name, g.ceo && g.ceo.title, ln(g.ceo), g.ceo && g.ceo.img]);
   return sigBoxes(l);
 }
@@ -1767,9 +1787,9 @@ function printPapers(htmls) {
 window.addEventListener('afterprint', function () { document.body.classList.remove('printing'); $('#printArea').innerHTML = ''; });
 
 /* ================================================================ v3: raise, versions, HR/owner actions, approvals register */
-var CAP_AR = { owner: 'مالك النظام', hr: 'الموارد البشرية', evaluator: 'المقيّم', gm: 'المدير العام', ceo: 'الرئيس التنفيذي', auditor: 'المدقق الداخلي', employee: 'الموظف' };
+var CAP_AR = { owner: 'مالك النظام', hr: 'الموارد البشرية', evaluator: 'المقيّم', head: 'مدير القسم', ops: 'مدير العمليات', gm: 'المدير العام', ceo: 'الرئيس التنفيذي', auditor: 'المدقق الداخلي', employee: 'الموظف' };
 var VKIND = { submit: 'الإرسال الأول', resubmit: 'إعادة إرسال من المقيّم', hr_edit: 'تعديل الموارد البشرية / المالك', correction: 'تصحيح معتمد بطلب', migrated: 'النسخة الأصلية (قبل نظام النسخ)' };
-var ACT_AR = { submit: 'إرسال التقييم', resubmit: 'إعادة الإرسال', 'employee-sign': 'توقيع الموظف', hr_forward: 'إحالة الموارد البشرية إلى المدير العام', hr_return: 'إعادة إلى المقيّم', gm_approve: 'اعتماد المدير العام', gm_return: 'إعادة من المدير العام', ceo_approve: 'مصادقة الرئيس التنفيذي', ceo_return: 'إعادة من الرئيس التنفيذي', set_ceo: 'تغيير مصادقة الرئيس التنفيذي', hr_edit: 'تعديل الموارد البشرية', recall: 'استرجاع', cancel: 'إلغاء', correction: 'تصحيح معتمد', record_cancelled: 'إلغاء السجل المعتمد' };
+var ACT_AR = { submit: 'إرسال التقييم', resubmit: 'إعادة الإرسال', 'employee-sign': 'توقيع الموظف', hr_forward: 'إحالة الموارد البشرية إلى المدير العام', hr_return: 'إعادة إلى المقيّم', gm_approve: 'اعتماد المدير العام', gm_return: 'إعادة من المدير العام', ceo_approve: 'مصادقة الرئيس التنفيذي', ceo_return: 'إعادة من الرئيس التنفيذي', set_ceo: 'تغيير مصادقة الرئيس التنفيذي', paper_ack: 'تسجيل توقيع ورقي للموظف', head_approve: 'اعتماد مدير القسم', head_return: 'إعادة من مدير القسم', ops_approve: 'اعتماد مدير العمليات', ops_return: 'إعادة من مدير العمليات', hr_edit: 'تعديل الموارد البشرية', recall: 'استرجاع', cancel: 'إلغاء', correction: 'تصحيح معتمد', record_cancelled: 'إلغاء السجل المعتمد' };
 var EXEC_AR = { na: ['لا يوجد أثر تنفيذي', 'rx'], scheduled: ['مجدول قبل تاريخ النفاذ', 'r1'], due: ['مستحق التنفيذ', 'r1'], executed: ['نُفّذ', 'r3'], reversal_pending: ['بانتظار عكس الأثر', 'r0'], reversed: ['عُكس الأثر', 'r2'], adjust_pending: ['بانتظار التسوية', 'r0'], adjusted: ['سُوّي', 'r2'], cancelled: ['أُلغي التنفيذ', 'rx'] };
 var RSTAT_AR = { active: ['سارٍ', 'r3'], superseded: ['مستبدل', 'r1'], cancelled: ['ملغى', 'r0'] };
 var CR_AR = { pending_gm: ['بانتظار المدير العام', 'r1'], pending_ceo: ['بانتظار الرئيس التنفيذي', 'r1'], approved: ['معتمد', 'r3'], rejected: ['مرفوض', 'r0'], withdrawn: ['مسحوب', 'rx'] };
@@ -1818,7 +1838,7 @@ function hrChangesHtml(r, paper) {
   if (!l.length && !rc && !cn && !paper) return '';
   var head = paper ? '<div class="band"><span>ملاحظات وتعديلات الموارد البشرية / مالك النظام</span><span class="en">HR / OWNER NOTES &amp; CHANGES</span></div>' : '<div class="card hrc"><div class="hd"><h2>ملاحظات وتعديلات الموارد البشرية / مالك النظام</h2><span class="en">HR / owner notes &amp; changes</span></div><div class="bd stack">';
   var body = '<div class="vline">النسخة المعروضة: <b class="num">' + (r.v || 1) + '</b> من ' + ((r.versions || []).length || 1) + ' — هي الأحدث' + (r.submitted ? ' · تاريخ الرفع الأصلي: <bdi dir="ltr" class="num">' + esc(sigDate(r.submitted)) + '</bdi>' : '') + (r.resubmitted ? ' · تاريخ إعادة الرفع: <bdi dir="ltr" class="num">' + esc(sigDate(r.resubmitted)) + '</bdi>' : '') + '</div>';
-  if (rc) body += '<div class="note warn">استُرجعت الاستمارة من ' + (rc.from === 'ceo' ? 'الرئيس التنفيذي' : 'المدير العام') + ' بتاريخ <bdi dir="ltr" class="num">' + esc(sigDate(rc.at)) + '</bdi> بواسطة ' + esc(rc.by) + ' (' + (CAP_AR[rc.cap] || '') + ') — النسخة ' + rc.v + ' / الجولة ' + rc.round + ' لا تُعتمد. السبب: ' + esc(rc.reason) + '</div>';
+  if (rc) body += '<div class="note warn">استُرجعت الاستمارة من ' + (WFS[rc.from] ? WFS[rc.from][0].replace('عند ', '') : '') + ' بتاريخ <bdi dir="ltr" class="num">' + esc(sigDate(rc.at)) + '</bdi> بواسطة ' + esc(rc.by) + ' (' + (CAP_AR[rc.cap] || '') + ') — النسخة ' + rc.v + ' / الجولة ' + rc.round + ' لا تُعتمد. السبب: ' + esc(rc.reason) + '</div>';
   if (cn) body += '<div class="note warn">أُلغيت الاستمارة بتاريخ <bdi dir="ltr" class="num">' + esc(sigDate(cn.at)) + '</bdi> بواسطة ' + esc(cn.by) + ' (' + (CAP_AR[cn.cap] || '') + '). السبب: ' + esc(cn.reason) + '</div>';
   body += l.length ? l.map(function (x) {
     var d = x.scoreFrom != null && x.scoreTo != null ? Math.round((x.scoreTo - x.scoreFrom) * 10) / 10 : null;
@@ -1867,7 +1887,7 @@ function hrTools(rec) {
   if (!isAdmin() || !rec.wf) return '';
   var st = rec.wf.stage, h = '';
   if (st === 'hr' && grant('edit') && rec.ev.email !== S.user.email) h += '<a class="btn sec sm" href="#/eval/' + encodeURIComponent(rec.id) + '?hr=1">' + ic('eval') + 'تعديل الموارد البشرية</a>';
-  if ((st === 'gm' || st === 'ceo') && grant('recall')) h += '<button class="btn sec sm" data-hr="recall">' + ic('back') + 'استرجاع</button>';
+  if (/^(ops|gm|ceo)$/.test(st) && grant('recall')) h += '<button class="btn sec sm" data-hr="recall">' + ic('back') + 'استرجاع</button>';
   if (st !== 'done' && st !== 'cancelled' && grant('cancel')) h += '<button class="btn danger sm" data-hr="cancel">إلغاء الاستمارة</button>';
   if (rec.recordRef) h += '<a class="btn sec sm" href="#/records/' + encodeURIComponent(rec.recordRef) + '">' + ic('archive') + esc(rec.recordRef) + '</a>';
   return h;
@@ -1878,7 +1898,7 @@ function hrBind(rec, admin) {
     var vv = e.target.closest('[data-vv]'); if (vv) return versionsModal(rec, function () { openEval(rec, admin); });
     var b = e.target.closest('[data-hr]'); if (!b) return;
     var act = b.dataset.hr;
-    if (act === 'recall') reasonModal('استرجاع الاستمارة', 'تعود الاستمارة إلى مراجعة الموارد البشرية، ولا يمكن اعتماد النسخة المسترجعة. يُحفظ السبب في السجل.', 'سبب الاسترجاع (إلزامي)', 'استرجاع').then(function (t) { if (!t) return openEval(rec, admin); api('recall', { id: rec.id, reason: t }).then(function (r) { syncEval(rec, r.eval); toast('استُرجعت الاستمارة'); openEval(rec, admin); }).catch(function (er) { toast(er.message); openEval(rec, admin); }); });
+    if (act === 'recall') reasonModal('استرجاع الاستمارة', 'تعود الاستمارة إلى مراجعة الموارد البشرية (يبقى توقيع مدير القسم)، ولا يمكن اعتماد النسخة المسترجعة. يُحفظ السبب في السجل.', 'سبب الاسترجاع (إلزامي)', 'استرجاع').then(function (t) { if (!t) return openEval(rec, admin); api('recall', { id: rec.id, reason: t }).then(function (r) { syncEval(rec, r.eval); toast('استُرجعت الاستمارة'); openEval(rec, admin); }).catch(function (er) { toast(er.message); openEval(rec, admin); }); });
     if (act === 'cancel') reasonModal('إلغاء الاستمارة', 'تتحول الحالة إلى «ملغاة» وتبقى البيانات والسجل كاملة.', 'سبب الإلغاء (إلزامي)', 'إلغاء الاستمارة', true).then(function (t) { if (!t) return openEval(rec, admin); api('cancelEval', { id: rec.id, reason: t }).then(function (r) { syncEval(rec, r.eval); toast('أُلغيت الاستمارة'); openEval(rec, admin); }).catch(function (er) { toast(er.message); openEval(rec, admin); }); });
   });
 }
@@ -1891,7 +1911,7 @@ function auditLogHtml(r) {
 
 /* ----- official approvals register */
 var RF = { q: '', st: '', ex: '', co: '', br: '', from: '', to: '' };
-function canRecords() { return /^(admin|gm|ceo|auditor)$/.test(role()); }
+function canRecords() { return /^(admin|ops|gm|ceo|auditor)$/.test(role()); }
 VIEWS.records = function (v, ref) {
   if (!canRecords()) { location.hash = '#/home'; return; }
   v.innerHTML = head('الموافقات الرسمية المعتمدة', 'سجل مركزي غير قابل للتعديل لكل موافقة نهائية — مع النسخ وسلسلة التواقيع والتاريخ والحالة التنفيذية' + (role() === 'auditor' ? ' · نطاقك: ' + esc(scopeText()) : ''), '', '<button class="btn sec" id="rx">' + ic('dl') + 'تصدير CSV</button>') + '<div id="rl"><div class="loading" style="min-height:30vh"><div class="spin"></div></div></div>';
@@ -1974,7 +1994,7 @@ function openRecord(ref) {
       var tabs = [['final', 'النسخة النهائية'], ['chain', 'سلسلة الاعتماد'], ['versions', 'النسخ (' + x.content.versions.length + ')'], ['hist', 'التاريخ'], ['changes', 'التصحيح والإلغاء (' + crs.length + ')'], ['notes', 'ملاحظات التدقيق (' + (x.notes || []).length + ')']];
       var body = '';
       if (tab === 'final') body = hrChangesHtml(r) + '<div class="paperwrap">' + evalPaper(r) + '</div>';
-      if (tab === 'chain') body = '<div class="tw"><table class="t"><thead><tr><th>الدور</th><th>الاسم</th><th>المنصب</th><th>التاريخ والوقت</th><th>النسخة / الجولة</th><th>التوقيع</th></tr></thead><tbody>' + (r.wf.sigs || []).map(function (s) { var valid = s.v === r.v && (s.round === r.wf.round || s.role === 'mgr' || s.role === 'emp'); return '<tr' + (valid ? '' : ' style="opacity:.55"') + '><td>' + ({ mgr: 'المقيّم', emp: 'الموظف', hr: 'الموارد البشرية', gm: 'المدير العام', ceo: 'الرئيس التنفيذي' }[s.role] || s.role) + (s.change ? ' <span class="tag">' + esc(s.change) + '</span>' : '') + '</td><td>' + esc(s.name || '') + '</td><td>' + esc(s.title || '') + '</td><td class="num">' + esc(sigDate(s.at)) + '</td><td class="num">' + s.v + ' / ' + s.round + (valid ? '' : ' <span class="muted">(نسخة/جولة سابقة)</span>') + '</td><td>' + (s.img ? '<img src="' + esc(s.img) + '" alt="" style="max-height:38px">' : s.paper ? 'ورقي' : '') + '</td></tr>'; }).join('') + '</tbody></table></div>';
+      if (tab === 'chain') body = '<div class="tw"><table class="t"><thead><tr><th>الدور</th><th>الاسم</th><th>المنصب</th><th>التاريخ والوقت</th><th>النسخة / الجولة</th><th>التوقيع</th></tr></thead><tbody>' + (r.wf.sigs || []).map(function (s) { var valid = s.v === r.v && (s.round === r.wf.round || s.role === 'mgr' || s.role === 'emp'); return '<tr' + (valid ? '' : ' style="opacity:.55"') + '><td>' + (SIGROLE[s.role] || s.role) + (s.change ? ' <span class="tag">' + esc(s.change) + '</span>' : '') + '</td><td>' + esc(s.name || '') + '</td><td>' + esc(s.title || '') + '</td><td class="num">' + esc(sigDate(s.at)) + '</td><td class="num">' + s.v + ' / ' + s.round + (valid ? '' : ' <span class="muted">(نسخة/جولة سابقة)</span>') + '</td><td>' + (s.img ? '<img src="' + esc(s.img) + '" alt="" style="max-height:38px">' : s.paper ? 'ورقي' : '') + '</td></tr>'; }).join('') + '</tbody></table></div>';
       if (tab === 'versions') body = '<div><button class="btn sec sm" data-ra="vers">' + ic('swap') + 'عرض النسخ ومقارنتها</button></div><table class="t" style="margin-top:8px"><thead><tr><th>النسخة</th><th>النوع</th><th>بواسطة</th><th>التاريخ</th><th>السبب</th><th>sha256</th></tr></thead><tbody>' + x.content.versions.map(function (y) { return '<tr><td class="num">' + y.v + '</td><td>' + (VKIND[y.kind] || y.kind) + '</td><td>' + esc(y.by.name) + ' · ' + (CAP_AR[y.by.cap] || '') + '</td><td class="num">' + esc(sigDate(y.at)) + '</td><td>' + esc(y.reason || '—') + '</td><td class="num" style="font-size:10px">' + esc(y.sha) + '</td></tr>'; }).join('') + '</tbody></table>';
       if (tab === 'hist') body = auditLogHtml(r).replace('<details class="card hlog">', '<details class="card hlog" open>') + '<h3 style="margin:12px 0 6px">الحالة التنفيذية</h3>' + ((x.exec.history || []).length ? '<table class="t"><tbody>' + x.exec.history.map(function (h) { return '<tr><td class="num">' + esc(sigDate(h.at)) + '</td><td>' + esc(h.by) + '</td><td>' + esc((EXEC_AR[h.from] || [h.from])[0]) + ' ← ' + esc((EXEC_AR[h.to] || [h.to])[0]) + '</td><td>' + esc(h.note || '') + '</td></tr>'; }).join('') + '</tbody></table>' : '<div class="muted">لا حركات تنفيذية بعد</div>');
       if (tab === 'changes') body = crs.length ? changesList(crs) : '<div class="empty">لا توجد طلبات تصحيح أو إلغاء على هذا السجل</div>';
@@ -2029,7 +2049,7 @@ function recordPaper(x, r) {
     '<tr><td class="k">تاريخ النفاذ</td><td class="num">' + esc(x.effective || '—') + '</td><td class="k">النسخة المعتمدة</td><td class="num">' + x.v + ' / ' + x.round + '</td></tr>' +
     '<tr><td class="k">الروابط</td><td colspan="3" class="num">' + esc([x.supersedes && 'يستبدل ' + x.supersedes, x.supersededBy && 'استُبدل بـ ' + x.supersededBy, x.cancelledBy && 'أُلغي بالطلب ' + x.cancelledBy].filter(Boolean).join(' · ') || '—') + '</td></tr>' +
     '<tr><td class="k">بصمة المحتوى</td><td colspan="3" class="num" style="font-size:9px">sha256 ' + esc(x.sha) + '</td></tr></table>' +
-    '<div class="band"><span>سلسلة الاعتماد</span><span class="en">APPROVAL CHAIN</span></div><table><tr><th>الدور</th><th>الاسم</th><th>التاريخ</th><th>النسخة/الجولة</th></tr>' + (x.chain || []).map(function (s) { return '<tr><td>' + ({ mgr: 'المقيّم', emp: 'الموظف', hr: 'الموارد البشرية', gm: 'المدير العام', ceo: 'الرئيس التنفيذي' }[s.role] || s.role) + '</td><td>' + esc(s.name) + '</td><td class="num">' + esc(sigDate(s.at)) + '</td><td class="num">' + s.v + '/' + s.round + '</td></tr>'; }).join('') + '</table>' +
+    '<div class="band"><span>سلسلة الاعتماد</span><span class="en">APPROVAL CHAIN</span></div><table><tr><th>الدور</th><th>الاسم</th><th>التاريخ</th><th>النسخة/الجولة</th></tr>' + (x.chain || []).map(function (s) { return '<tr><td>' + (SIGROLE[s.role] || s.role) + '</td><td>' + esc(s.name) + '</td><td class="num">' + esc(sigDate(s.at)) + '</td><td class="num">' + s.v + '/' + s.round + '</td></tr>'; }).join('') + '</table>' +
     '</div>' + evalPaper(r);
 }
 function exportRecordsCSV(l) {

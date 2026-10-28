@@ -106,7 +106,7 @@ function cleanPurpose(p) {
   return o;
 }
 const cleanSig = (x) => (typeof x === 'string' && /^data:image\/(png|jpeg|webp);base64,/.test(x) && x.length < 90000 ? x : '');
-const WF_NAMES = { employee: 'بانتظار توقيع الموظف', hr: 'مراجعة الموارد البشرية', gm: 'عند المدير العام', ceo: 'عند الرئيس التنفيذي', returned: 'مُعاد للمقيّم', done: 'معتمد نهائياً', cancelled: 'ملغاة' };
+const WF_NAMES = { employee: 'بانتظار توقيع الموظف', head: 'عند مدير القسم', hr: 'مراجعة الموارد البشرية', ops: 'عند مدير العمليات', gm: 'عند المدير العام', ceo: 'عند الرئيس التنفيذي', returned: 'مُعاد للمقيّم', done: 'معتمد نهائياً', cancelled: 'ملغاة' };
 const PROFILE_KEYS = ['phone', 'email', 'hire', 'birth', 'company', 'brand', 'grade', 'contract', 'nat', 'address', 'notes'];
 const empDept = (e) => (JOBS[e[2]] ? JOBS[e[2]].dept : 0);
 
@@ -120,7 +120,7 @@ async function users() {
 }
 const hash = (pw, salt) => crypto.pbkdf2Sync(String(pw), salt, 120000, 32, 'sha256').toString('base64');
 const randCode = () => crypto.randomBytes(3).toString('hex').toUpperCase();
-const ROLES = ['admin', 'manager', 'gm', 'ceo', 'auditor'];
+const ROLES = ['admin', 'manager', 'ops', 'gm', 'ceo', 'auditor'];
 const roleOf = (u) => (ROLES.includes(u.role) ? u.role : 'manager');
 const deptList = (u) => (roleOf(u) === 'manager' ? (u.depts || []).map(Number) : roleOf(u) === 'auditor' ? [] : 'ALL');
 const permsOf = (u) => (u.role === 'admin' ? { jd: true, emp: true } : { jd: !!(u.perms && u.perms.jd), emp: !!(u.perms && u.perms.emp) });
@@ -188,7 +188,9 @@ async function boxItems(email, u) {
     let take = false, act = false, why = '';
     if (role === 'gm') { take = !!(w && (st === 'gm' || st === 'ceo' || st === 'done' || (w.sig && w.sig.gm))); act = st === 'gm'; why = act ? 'بانتظار اعتمادك ومصادقتك' : st === 'done' ? 'معتمد نهائياً' : ''; }
     else if (role === 'ceo') { take = !!(w && w.ceo && (st === 'ceo' || st === 'done')); act = st === 'ceo'; why = act ? 'حالة استثنائية بانتظار مصادقتك' : 'تمت المصادقة'; }
-    else if (role === 'manager') { take = x.ev.email === email || inD(x.emp.dept); act = !!(w && st === 'returned' && x.ev.email === email); why = act ? 'أُعيد إليك للتعديل' : x.ev.email === email ? (w && st === 'done' ? 'اعتُمد تقييمك نهائياً' : w && st === 'hr' ? 'وقّع الموظف — لدى الموارد البشرية' : w && (st === 'gm' || st === 'ceo') ? 'قيد الاعتماد لدى الإدارة' : '') : 'تقييم لموظف في قسمك'; }
+    else if (role === 'ops') { take = !!(w && w.ops && w.ops.email === email); act = take && st === 'ops'; why = act ? 'بانتظار اعتمادك كمدير العمليات' : st === 'done' ? 'معتمد نهائياً' : ''; }
+    else if (role === 'manager' && w && st === 'head' && w.head && w.head.email === email) { take = true; act = true; why = 'بانتظار اعتمادك كمدير القسم'; }
+    else if (role === 'manager') { take = x.ev.email === email || inD(x.emp.dept); act = !!(w && st === 'returned' && x.ev.email === email); why = act ? 'أُعيد إليك للتعديل' : x.ev.email === email ? (w && st === 'done' ? 'اعتُمد تقييمك نهائياً' : w && st === 'hr' ? 'وقّع الموظف — لدى الموارد البشرية' : w && st === 'head' ? 'لدى مدير القسم' : w && /^(ops|gm|ceo)$/.test(st) ? 'قيد الاعتماد لدى الإدارة' : '') : 'تقييم لموظف في قسمك'; }
     else if (role === 'admin') { take = !!(w && st === 'hr'); act = take; why = 'وقّع الموظف — بانتظار مراجعتك'; }
     if (take) out.push({ k: 'eval', key: 'e:' + x.id, at: x.updated, act, why, eval: x });
   }
@@ -206,7 +208,14 @@ const GRANTS = ['recall', 'cancel', 'edit', 'exec'];
 const isOwner = (u) => u.role === 'admin' && !!u.owner;
 const grantsOf = (u) => { const g = {}; for (const k of GRANTS) g[k] = isOwner(u) || (u.role === 'admin' && !!(u.grants && u.grants[k])); return g; };
 const capOf = (u) => (isOwner(u) ? 'owner' : u.role === 'admin' ? 'hr' : u.role === 'manager' ? 'evaluator' : u.role);
-const CAP_NAMES = { owner: 'مالك النظام', hr: 'الموارد البشرية', evaluator: 'المقيّم', gm: 'المدير العام', ceo: 'الرئيس التنفيذي', auditor: 'المدقق الداخلي', employee: 'الموظف' };
+/* the department head who approves after the employee: one manager per department, marked by HR */
+async function headFor(r) {
+  const e = Object.entries(await users()).find(([, x]) => x.active !== false && x.role === 'manager' && (x.heads || []).map(Number).includes(Number(r.emp.dept)));
+  if (!e) return { skipped: 'none' };
+  return { email: e[0], name: e[1].name, title: e[1].title || '', ...(e[0] === r.ev.email ? { skipped: 'self' } : {}) };
+}
+const afterEmployee = (r) => { r.wf.stage = r.wf.head && r.wf.head.email && !r.wf.head.skipped ? 'head' : 'hr'; };
+const CAP_NAMES = { owner: 'مالك النظام', hr: 'الموارد البشرية', evaluator: 'المقيّم', gm: 'المدير العام', ceo: 'الرئيس التنفيذي', auditor: 'المدقق الداخلي', employee: 'الموظف', ops: 'مدير العمليات', head: 'مدير القسم' };
 const sha = (o) => crypto.createHash('sha256').update(JSON.stringify(o)).digest('hex');
 const needGrant = (u, k) => { if (!grantsOf(u)[k]) err('forbidden', 'ليست لديك صلاحية هذا الإجراء (تُمنح من مالك النظام)'); };
 const needReason = (s, min = 5) => { s = String(s || '').trim().slice(0, 1500); if (s.length < min) err('invalid', 'السبب إلزامي'); return s; };
@@ -308,7 +317,8 @@ function pushSig(r, role, s) { r.wf.sigs = r.wf.sigs || []; const x = { role, ..
 function involved(r) {
   const w = r.wf, cur = (w.sigs || []).filter((s) => s.v === r.v && s.round === w.round);
   const editors = (r.versions || []).filter((x) => x.kind === 'hr_edit' || x.kind === 'correction').map((x) => x.by.email);
-  return { evaluator: r.ev.email, forwarder: (cur.find((s) => s.role === 'hr') || {}).email, gm: (cur.find((s) => s.role === 'gm') || {}).email, editors };
+  const head = (w.sigs || []).filter((s) => s.role === 'head' && s.v === r.v).slice(-1)[0];
+  return { evaluator: r.ev.email, head: head && head.email, forwarder: (cur.find((s) => s.role === 'hr') || {}).email, ops: (cur.find((s) => s.role === 'ops') || {}).email, gm: (cur.find((s) => s.role === 'gm') || {}).email, editors };
 }
 /* existing evaluations get version 1 from their current content; nothing is archived retroactively */
 let MIGRATED = false;
@@ -353,7 +363,7 @@ async function archiveEval(r, extra = {}) {
   const have = Object.values(idx.items).find((x) => x.srcId === r.id && x.v === r.v);
   if (have) { if (r.recordRef !== have.ref) { r.recordRef = have.ref; } return have; }
   const dept = SEED && SEED.depts.find((d) => d.no === r.emp.dept), meta = empMeta(r.emp.id);
-  const ref = nextRef(idx, 'OR'), ts = now(), fin = (r.wf.sigs || []).filter((s) => s.v === r.v && s.round === r.wf.round);
+  const ref = nextRef(idx, 'OR'), ts = now(), fin = ['mgr', 'emp', 'head', 'hr', 'ops', 'gm', 'ceo'].map((k) => r.wf.sig[k]).filter(Boolean);
   const content = { eval: JSON.parse(JSON.stringify(r)), versions: r.versions.map((x) => ({ v: x.v, at: x.at, kind: x.kind, by: x.by, reason: x.reason, sha: x.sha })) };
   const item = { ref, type: 'performance_eval', typeName: 'تقييم أداء', module: 'performance', srcId: r.id, v: r.v, round: r.wf.round,
     title: (r.pp && r.pp.k !== 'periodic' ? ({ raise: 'زيادة راتب', promo_raise: 'ترقية مع زيادة', promo: 'ترقية', move: 'نقل', confirm: 'تثبيت' })[r.pp.k] + ' — ' : '') + ({ annual: 'سنوي', mid: 'نصف سنوي', quarter: 'ربع سنوي', probation: 'نهاية التجربة' }[r.type] || r.type) + ' ' + r.period,
@@ -379,7 +389,7 @@ function scopeOk(u, item) {
   return (!co.length || co.includes(item.emp.company)) && (!br.length || br.includes(item.emp.branch));
 }
 async function recReader(token) {
-  const a = await auth(token); if (!['admin', 'gm', 'ceo', 'auditor'].includes(a.u.role)) err('forbidden', 'سجل الموافقات للإدارة والموارد البشرية والتدقيق فقط'); return a;
+  const a = await auth(token); if (!['admin', 'ops', 'gm', 'ceo', 'auditor'].includes(a.u.role)) err('forbidden', 'سجل الموافقات للإدارة والموارد البشرية والتدقيق فقط'); return a;
 }
 const recSummary = (x) => ({ ...x, exec: { ...x.exec, status: execNow(x) }, notesOpen: (x.notes || []).filter((n) => n.status !== 'closed').length });
 
@@ -445,13 +455,13 @@ const R = {
     }
     res.boxUnread = (await boxItems(email, u)).filter((i) => i.unread).length;
     res.fx = st.fx || null;
-    if (['admin', 'gm', 'ceo', 'auditor'].includes(pu.role)) {
+    if (['admin', 'ops', 'gm', 'ceo', 'auditor'].includes(pu.role)) {
       if (pu.role === 'admin') { try { await sweepRecords(); } catch (e) { console.error('sweep', e); } }
       const idx = await recIndex(), its = Object.values(idx.items).filter((x) => scopeOk(u, x)), crs = Object.values(await getJSON('chreqs', {}));
       res.recStats = { total: its.length, due: its.filter((x) => ['due', 'reversal_pending', 'adjust_pending'].includes(execNow(x))).length, notes: its.reduce((t, x) => t + (x.notes || []).filter((n) => n.status !== 'closed').length, 0),
         changes: crs.filter((c) => (pu.role === 'gm' && c.status === 'pending_gm') || (pu.role === 'ceo' && c.status === 'pending_ceo')).length };
     }
-    if (pu.role === 'admin') res.users = Object.entries(await users()).filter(([, x]) => x.role === 'admin').map(([e, x]) => ({ email: e, name: x.name }));
+    if (pu.role === 'admin') { const us = Object.entries(await users()); res.users = us.filter(([, x]) => x.role === 'admin').map(([e, x]) => ({ email: e, name: x.name })); res.opsUsers = us.filter(([, x]) => x.role === 'ops' && x.active !== false).map(([e, x]) => ({ email: e, name: x.name, title: x.title || '' })); res.heads = Object.fromEntries(us.filter(([, x]) => x.role === 'manager' && x.active !== false).flatMap(([e, x]) => (x.heads || []).map((h) => [h, x.name]))); }
     return res;
   },
   async unlockData({ token, passphrase }) {
@@ -498,7 +508,7 @@ const R = {
     out.wf = { stage: 'employee', ceo: false, round: xw.round || 0, ack: xw.ack || crypto.randomBytes(9).toString('base64url'), sig: {}, sigs: xw.sigs || [], log: xw.log || [], recalled: xw.recalled || null };
     const who = { name: u.name, email, cap: 'evaluator' };
     const changes = addVersion(out, who, ex ? 'resubmit' : 'submit', '', ex ? snapOf(ex) : null);
-    pushSig(out, 'mgr', { name: out.ev.name, title: out.ev.title, email: out.ev.email, at: ts, img: sig });
+    pushSig(out, 'mgr', { name: out.ev.name, title: out.ev.title, email: out.ev.email, at: ts, img: sig }); out.wf.head = await headFor(out); out.wf.ops = null;
     logAct(out, who, ex ? 'resubmit' : 'submit', { changes, scoreFrom: ex ? ex.F : null, scoreTo: out.F, stFrom: ex ? ex.wf && ex.wf.stage : '', stTo: 'employee' });
     const sf = Object.values(await getJSON('selfs', {})).filter((x) => x.status === 'done' && x.emp.id === e[0] && x.type === rec.type && x.period === period).sort((a, b) => (a.submitted < b.submitted ? 1 : -1))[0];
     if (sf) out.self = { code: sf.code, a: sf.a, b: sf.b, A: sf.A, B: sf.B, F: sf.F, r: sf.r, n: sf.n, at: sf.submitted };
@@ -662,10 +672,10 @@ const R = {
     const all = await evals(), r = Object.values(all).find((x) => x.wf && x.wf.ack === String(code || '')); if (!r) err('not_found', 'الرابط غير صالح أو انتهت صلاحيته');
     if (r.wf.stage !== 'employee') err('locked', 'تم توقيع هذا التقييم مسبقاً');
     const sig = cleanSig(img); if (!sig) err('invalid', 'التوقيع مطلوب'); const ts = now();
-    pushSig(r, 'emp', { name: r.emp.name, at: ts, img: sig }); r.n.e = String(note || '').slice(0, 1500); r.wf.stage = 'hr'; r.read = false; r.updated = ts;
-    logAct(r, { name: r.emp.name, email: '', cap: 'employee' }, 'employee-sign', { stFrom: 'employee', stTo: 'hr' }); await setJSON('evals', all); return { stage: 'hr' };
+    pushSig(r, 'emp', { name: r.emp.name, at: ts, img: sig }); r.n.e = String(note || '').slice(0, 1500); r.wf.head = await headFor(r); afterEmployee(r); r.read = false; r.updated = ts;
+    logAct(r, { name: r.emp.name, email: '', cap: 'employee' }, 'employee-sign', { stFrom: 'employee', stTo: r.wf.stage }); await setJSON('evals', all); return { stage: r.wf.stage };
   },
-  async wfAction({ token, id, act, img, note, ceo, v, round }) {
+  async wfAction({ token, id, act, img, note, ceo, ops, v, round }) {
     await loadData(false);
     const { email, u } = await auth(token), role = roleOf(u), all = await evals(), r = all[id]; if (!r) err('not_found', 'التقييم غير موجود');
     const ts = now(), sig = cleanSig(img) || u.sig || '', who = { name: u.name, title: u.title || '', email, at: ts, img: sig }, actor = { name: u.name, email, cap: capOf(u) };
@@ -675,18 +685,32 @@ const R = {
     /* an approval is bound to the version and round it reviewed */
     const bound = () => { if (Number(v) !== r.v || Number(round) !== r.wf.round) err('stale_version', 'تغيّرت الاستمارة بعد فتحها (النسخة الحالية ' + r.v + '). حدّث الصفحة وراجع النسخة الأخيرة قبل الاعتماد.'); };
     const inv = involved(r), sep = (list) => { if (list.filter(Boolean).includes(email)) err('forbidden', 'فصل المهام: لا يعتمد من قيّم الموظف أو أحال الاستمارة أو عدّلها أو اعتمدها في مرحلة سابقة'); };
-    if (act === 'hr_forward') {
-      need(['hr', 'employee'], ['admin']); needSig();
+    const mine = (k) => { if (!(r.wf[k] && r.wf[k].email === email)) err('forbidden', 'هذه الاستمارة مسندة إلى ' + ((r.wf[k] && r.wf[k].name) || 'شخص آخر')); };
+    const clear = (...ks) => { for (const k of ks) delete r.wf.sig[k]; };
+    if (act === 'paper_ack') {
+      /* the employee signed on paper: HR records it, the chain continues to the department head */
+      need(['employee'], ['admin']); pushSig(r, 'emp', { name: r.emp.name, at: ts, paper: true, by: u.name }); r.wf.head = await headFor(r); afterEmployee(r);
+    } else if (act === 'head_approve') { need(['head'], ['manager']); mine('head'); bound(); sep([inv.evaluator, ...inv.editors]); needSig(); pushSig(r, 'head', who); r.wf.stage = 'hr'; r.read = false; }
+    else if (act === 'head_return') { need(['head'], ['manager']); mine('head'); r.wf.stage = 'returned'; r.wf.sig = { mgr: r.wf.sig.mgr }; }
+    else if (act === 'hr_forward') {
+      need(['hr'], ['admin']); needSig();
       if (r.pp && r.pp.incomplete) err('invalid', 'أكمل بيانات الزيادة (الراتب الأساسي والعملة) من «تعديل الموارد البشرية» قبل الإحالة');
-      r.wf.round = (r.wf.round || 0) + 1;
-      if (r.wf.stage === 'employee') pushSig(r, 'emp', { name: r.emp.name, at: ts, paper: true });
-      pushSig(r, 'hr', who); r.wf.ceo = !!ceo; r.wf.stage = 'gm';
-    } else if (act === 'hr_return') { need(['hr', 'employee'], ['admin']); r.wf.stage = 'returned'; r.wf.sig = { mgr: r.wf.sig.mgr }; }
-    else if (act === 'gm_approve') { need(['gm'], ['gm']); bound(); sep([inv.evaluator, inv.forwarder, ...inv.editors]); needSig(); pushSig(r, 'gm', who); r.wf.stage = r.wf.ceo ? 'ceo' : 'done'; }
-    else if (act === 'gm_return') { need(['gm'], ['gm']); r.wf.stage = 'hr'; delete r.wf.sig.hr; }
-    else if (act === 'ceo_approve') { need(['ceo'], ['ceo']); bound(); sep([inv.evaluator, inv.forwarder, inv.gm, ...inv.editors]); needSig(); pushSig(r, 'ceo', who); r.wf.stage = 'done'; }
-    else if (act === 'ceo_return') { need(['ceo'], ['ceo']); r.wf.stage = 'hr'; delete r.wf.sig.hr; delete r.wf.sig.gm; }
-    else if (act === 'set_ceo') { need(['hr', 'gm', 'employee'], ['admin']); r.wf.ceo = !!ceo; }
+      let op = null;
+      if (ops) {
+        const ou = (await users())[lower(ops)]; if (!ou || ou.role !== 'ops' || ou.active === false) err('invalid', 'مدير العمليات المختار غير موجود أو غير فعّال');
+        if (lower(ops) === r.ev.email) err('forbidden', 'فصل المهام: مدير العمليات هو مقيّم هذه الاستمارة');
+        op = { email: lower(ops), name: ou.name, title: ou.title || '' };
+      }
+      r.wf.round = (r.wf.round || 0) + 1; clear('ops', 'gm', 'ceo');
+      pushSig(r, 'hr', who); r.wf.ceo = !!ceo; r.wf.ops = op; r.wf.stage = op ? 'ops' : 'gm';
+    } else if (act === 'hr_return') { need(['hr'], ['admin']); r.wf.stage = 'returned'; r.wf.sig = { mgr: r.wf.sig.mgr }; }
+    else if (act === 'ops_approve') { need(['ops'], ['ops']); mine('ops'); bound(); sep([inv.evaluator, inv.head, inv.forwarder, ...inv.editors]); needSig(); pushSig(r, 'ops', who); r.wf.stage = 'gm'; }
+    else if (act === 'ops_return') { need(['ops'], ['ops']); mine('ops'); r.wf.stage = 'hr'; clear('hr', 'ops'); }
+    else if (act === 'gm_approve') { need(['gm'], ['gm']); bound(); sep([inv.evaluator, inv.head, inv.forwarder, inv.ops, ...inv.editors]); needSig(); pushSig(r, 'gm', who); r.wf.stage = r.wf.ceo ? 'ceo' : 'done'; }
+    else if (act === 'gm_return') { need(['gm'], ['gm']); r.wf.stage = 'hr'; clear('hr', 'ops'); }
+    else if (act === 'ceo_approve') { need(['ceo'], ['ceo']); bound(); sep([inv.evaluator, inv.head, inv.forwarder, inv.ops, inv.gm, ...inv.editors]); needSig(); pushSig(r, 'ceo', who); r.wf.stage = 'done'; }
+    else if (act === 'ceo_return') { need(['ceo'], ['ceo']); r.wf.stage = 'hr'; clear('hr', 'ops', 'gm'); }
+    else if (act === 'set_ceo') { need(['hr', 'employee', 'head'], ['admin']); r.wf.ceo = !!ceo; }
     else err('bad_action', 'إجراء غير معروف');
     if (r.wf.stage === 'done') { r.status = 'signed'; r.doneAt = ts; }
     logAct(r, actor, act, { note, stFrom: from, stTo: r.wf.stage }); r.updated = ts;
@@ -707,7 +731,8 @@ const R = {
     if (role === 'admin') out = l.filter((x) => x.wf && x.wf.stage !== 'done' && x.wf.stage !== 'cancelled');
     else if (role === 'gm') out = l.filter((x) => x.wf && (x.wf.stage === 'gm' || (x.wf.sig.gm && x.wf.sig.gm.email === email)));
     else if (role === 'ceo') out = l.filter((x) => x.wf && (x.wf.stage === 'ceo' || (x.wf.sig.ceo && x.wf.sig.ceo.email === email)));
-    else out = l.filter((x) => x.ev.email === email && x.wf);
+    else if (role === 'ops') out = l.filter((x) => x.wf && x.wf.ops && x.wf.ops.email === email);
+    else out = l.filter((x) => x.wf && (x.ev.email === email || (x.wf.head && x.wf.head.email === email && !x.wf.head.skipped)));
     return { evals: out.sort((a, b) => (a.updated < b.updated ? 1 : -1)) };
   },
   async listTrash({ token }) { await admin(token); return { evals: Object.values(await getJSON('trash', {})).sort((a, b) => (a.deleted < b.deleted ? 1 : -1)) }; },
@@ -748,7 +773,7 @@ const R = {
     await loadData(); const { email, u } = await admin(token); needGrant(u, 'edit'); reason = needReason(reason);
     const all = await evals(), r = all[id]; if (!r) err('not_found', 'التقييم غير موجود');
     const st = r.wf.stage;
-    if (st === 'gm' || st === 'ceo') err('recall_first', 'الاستمارة محالة إلى ' + WF_NAMES[st] + '. استرجعها أولاً ثم عدّلها.');
+    if (st === 'ops' || st === 'gm' || st === 'ceo') err('recall_first', 'الاستمارة محالة إلى ' + WF_NAMES[st] + '. استرجعها أولاً ثم عدّلها.');
     if (st === 'done') err('locked', 'الاستمارة معتمدة ومؤرشفة. التعديل يتم بطلب تصحيح من سجل الموافقات الرسمية.');
     if (st !== 'hr') err('invalid', 'التعديل متاح في مرحلة مراجعة الموارد البشرية فقط (المرحلة الحالية: ' + WF_NAMES[st] + ')');
     if (r.ev.email === email) err('forbidden', 'لا يعدّل المقيّم استمارته من هنا');
@@ -770,10 +795,10 @@ const R = {
   async recall({ token, id, reason }) {
     const { email, u } = await admin(token); needGrant(u, 'recall'); reason = needReason(reason);
     const all = await evals(), r = all[id]; if (!r) err('not_found', 'التقييم غير موجود');
-    const st = r.wf.stage; if (st !== 'gm' && st !== 'ceo') err('invalid', 'الاسترجاع متاح بعد الإحالة إلى المدير العام أو الرئيس التنفيذي وقبل الاعتماد النهائي');
+    const st = r.wf.stage; if (!['ops', 'gm', 'ceo'].includes(st)) err('invalid', 'الاسترجاع متاح بعد الإحالة إلى مدير العمليات أو المدير العام أو الرئيس التنفيذي وقبل الاعتماد النهائي');
     const who = { name: u.name, email, cap: capOf(u) };
     r.wf.recalled = { at: now(), by: u.name, email, cap: who.cap, reason, v: r.v, round: r.wf.round, from: st };
-    r.wf.stage = 'hr'; r.wf.sig = { mgr: r.wf.sig.mgr, emp: r.wf.sig.emp };
+    r.wf.stage = 'hr'; r.wf.sig = { mgr: r.wf.sig.mgr, emp: r.wf.sig.emp, ...(r.wf.sig.head ? { head: r.wf.sig.head } : {}) };
     logAct(r, who, 'recall', { reason, stFrom: st, stTo: 'hr' }); r.updated = now(); r.read = false;
     await setJSON('evals', all); await logVisit(email, u.name, 'eval-recall', r.emp.id); return { eval: r };
   },
@@ -900,7 +925,7 @@ const R = {
     const { all } = await admin(token), ev = Object.values(await evals()), vis = await getJSON('visits', []);
     return { users: Object.entries(all).map(([email, u]) => ({
       email, name: u.name, title: u.title || '', role: u.role, depts: deptList(u), allJD: !!u.allJD, active: u.active !== false, perms: permsOf(u),
-      owner: isOwner(u), grants: grantsOf(u), scope: u.scope || null, activated: !!u.hash, code: u.hash ? '' : (u.code || ''), created: u.created || '', lastLogin: u.last_login || '',
+      owner: isOwner(u), grants: grantsOf(u), scope: u.scope || null, heads: u.heads || [], activated: !!u.hash, code: u.hash ? '' : (u.code || ''), created: u.created || '', lastLogin: u.last_login || '',
       logins: u.visits || 0, actions: vis.filter((v) => v[1] === email).length, evals: ev.filter((x) => x.ev.email === email).length })) };
   },
   async saveUser({ token, user: d = {} }) {
@@ -919,7 +944,9 @@ const R = {
     const ids = (l) => (Array.isArray(l) ? l : []).map((x) => String(x).slice(0, 120)).filter(Boolean).slice(0, 50);
     const scope = role === 'auditor' ? { companies: ids(d.scope && d.scope.companies), branches: ids(d.scope && d.scope.branches) } : null;
     if (!meOwner && (role === 'auditor' || role === 'admin') && (!cur || cur.role !== role)) err('forbidden', 'منح دور الموارد البشرية أو التدقيق لمالك النظام فقط');
-    all[email] = { ...keep, name: String(d.name || '').slice(0, 80), title: String(d.title || '').slice(0, 80), role, depts, allJD: !!d.allJD, active: d.active !== false, perms: { jd: !!(d.perms && d.perms.jd), emp: !!(d.perms && d.perms.emp) }, grants, owner, scope };
+    const heads = role === 'manager' ? (d.heads || []).map(Number).filter((n) => depts.includes(n)) : [];
+    for (const h of heads) { const o = Object.entries(all).find(([m, x]) => m !== email && x.active !== false && x.role === 'manager' && (x.heads || []).map(Number).includes(h)); if (o) err('exists', 'القسم ' + h + ' له مدير قسم معتمد: ' + o[1].name + '. أزله منه أولاً.'); }
+    all[email] = { ...keep, heads, name: String(d.name || '').slice(0, 80), title: String(d.title || '').slice(0, 80), role, depts, allJD: !!d.allJD, active: d.active !== false, perms: { jd: !!(d.perms && d.perms.jd), emp: !!(d.perms && d.perms.emp) }, grants, owner, scope };
     if (!cur) { code = randCode(); all[email].code = code; all[email].created = now(); all[email].visits = 0; }
     await setJSON('users', all); return { code };
   },
