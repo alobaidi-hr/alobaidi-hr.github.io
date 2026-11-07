@@ -58,6 +58,7 @@ function runMigrations(B, ed) {
     for (const o of m.ops) {
       if (o.op === 'addJob' && !jobOf(o.job.code)) putJob(cleanJob(o.job));
       else if (o.op === 'jobReportsTo') for (const c of o.codes) { const j = jobOf(c); if (j) putJob({ ...j, b: { ...j.b, ov: { ...j.b.ov, 'Reports To': o.value } } }); }
+      else if (o.op === 'jobPatch') { const j = jobOf(o.code); if (j) putJob(cleanJob({ ...j, b: { ...j.b, ...o.b, ov: { ...j.b.ov, ...(o.b.ov || {}) } } })); }
       else if (o.op === 'jobText') { const j = jobOf(o.code); if (j) putJob({ ...j, b: { ...j.b, duties: j.b.duties.map((p) => p.map((t) => String(t).split(o.from).join(o.to))) } }); }
       else if (o.op === 'moveEmp') {
         const e = cur().emps.find((x) => x[1] === o.name); if (!e || e[2] === o.to || !jobOf(o.to)) continue;

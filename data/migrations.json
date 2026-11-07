@@ -294,5 +294,209 @@
     "head_ar": "Shahad Ahmed Wadi — مشرف علاقات العملاء"
    }
   ]
+ },
+ {
+  "id": "2026-11-07-senior-internal-auditor-v2",
+  "by": "Aws Firas Al-Shalal",
+  "ops": [
+   {
+    "op": "jobPatch",
+    "code": "LO-AUD-01",
+    "b": {
+     "purpose": [
+      "Provide independent, objective assurance over the Group's financial, operational, and compliance controls across all Iraqi branches, in conformance with the IIA Global Internal Audit Standards, and recommend improvements that protect company assets. Exercise unrestricted access in accordance with the Audit Charter, without assuming operational responsibility.",
+      "تقديم تأكيد مستقل وموضوعي بشأن الضوابط المالية والتشغيلية والامتثال في جميع فروع المجموعة في العراق، وفقاً للمعايير العالمية للتدقيق الداخلي الصادرة عن معهد المدققين الداخليين IIA، والتوصية بالتحسينات التي تحمي أصول الشركة، مع التمتع بحق الوصول غير المقيّد وفق ميثاق التدقيق الداخلي، ودون تحمّل مسؤوليات تشغيلية."
+     ],
+     "duties": [
+      [
+       "Develop and execute the annual risk-based internal audit plan covering all branches and departments in coordination with the Internal Audit Manager, and obtain CEO/Board approval.",
+       "إعداد خطة التدقيق الداخلي السنوية المبنية على المخاطر لجميع الفروع والأقسام وتنفيذها بالتنسيق مع مدير التدقيق الداخلي، والحصول على اعتماد الرئيس التنفيذي / مجلس الإدارة."
+      ],
+      [
+       "Conduct financial, operational, inventory, and compliance audits and document findings with evidence.",
+       "إجراء عمليات التدقيق المالي والتشغيلي وتدقيق المخزون والامتثال وتوثيق الملاحظات بالأدلة."
+      ],
+      [
+       "Evaluate the adequacy and effectiveness of internal controls and the Authority Matrix.",
+       "تقييم كفاية الرقابة الداخلية ومصفوفة الصلاحيات وفاعليتهما."
+      ],
+      [
+       "Perform surprise cash counts, vehicle and stock counts, and spare parts inventory verification; reconcile results with system reports and obtain the custodian's signature.",
+       "إجراء الجرد المفاجئ للنقد والمركبات والمخزون والتحقق من مخزون قطع الغيار، ومطابقة النتائج مع تقارير النظام والحصول على توقيع أمين العهدة."
+      ],
+      [
+       "Investigate suspected fraud, irregularities, or policy violations in coordination with HR and Legal, and report confidentially to the Internal Audit Manager and CEO.",
+       "التحقيق في حالات الاحتيال أو المخالفات أو انتهاكات السياسات المشتبه بها بالتنسيق مع الموارد البشرية والشؤون القانونية، والإبلاغ عنها بسرية إلى مدير التدقيق الداخلي والرئيس التنفيذي."
+      ],
+      [
+       "Issue audit reports with clear findings, risk ratings, and actionable recommendations.",
+       "إصدار تقارير التدقيق بملاحظات واضحة وتصنيفات للمخاطر وتوصيات قابلة للتنفيذ."
+      ],
+      [
+       "Follow up on the implementation of agreed corrective actions and report status; escalate overdue and high-risk items to the Internal Audit Manager and CEO.",
+       "متابعة تنفيذ الإجراءات التصحيحية المتفق عليها والإبلاغ عن حالتها، وتصعيد الإجراءات المتأخرة وعالية المخاطر إلى مدير التدقيق الداخلي والرئيس التنفيذي."
+      ],
+      [
+       "Advise management on risk mitigation and control design for new processes without assuming management or operational responsibilities, approving processes, or taking ownership of management decisions.",
+       "تقديم المشورة للإدارة في الحد من المخاطر وتصميم الضوابط للإجراءات الجديدة، دون تحمّل مسؤوليات إدارية أو تشغيلية أو اعتماد الإجراءات أو تبنّي القرارات الإدارية."
+      ],
+      [
+       "Review audit working papers for quality, completeness and sufficient supporting evidence.",
+       "مراجعة أوراق عمل التدقيق للتأكد من جودتها واكتمالها وكفاية الأدلة الداعمة."
+      ],
+      [
+       "Confirm independence and objectivity annually and disclose any impairment to the Internal Audit Manager.",
+       "تأكيد الاستقلالية والموضوعية سنوياً والإفصاح لمدير التدقيق الداخلي عن أي إخلال بهما."
+      ],
+      [
+       "Submit quarterly reports to the Head of Internal Audit on audit plan status, resource requirements and overdue findings.",
+       "رفع تقارير ربع سنوية إلى رئيس التدقيق الداخلي عن حالة خطة التدقيق والاحتياجات من الموارد والملاحظات المتأخرة."
+      ],
+      [
+       "Use data analytics in audit planning, testing and follow-up.",
+       "استخدام تحليل البيانات في تخطيط التدقيق واختباراته ومتابعته."
+      ],
+      [
+       "Coordinate with external auditors and the UAE head office through the Internal Audit Manager.",
+       "التنسيق مع المدققين الخارجيين والمكتب الرئيسي في الإمارات من خلال مدير التدقيق الداخلي."
+      ]
+     ],
+     "kpis": [
+      {
+       "en": "Audit Plan Completion",
+       "ar": "إنجاز خطة التدقيق",
+       "t_en": "> 90% of the approved plan; 100% of high-risk audits",
+       "t_ar": "أكثر من 90% من الخطة المعتمدة؛ و100% من عمليات التدقيق عالية المخاطر",
+       "m_en": "Audit plan tracker",
+       "m_ar": "متابعة خطة التدقيق",
+       "f_en": "Quarterly",
+       "f_ar": "ربع سنوي",
+       "w": 20
+      },
+      {
+       "en": "Report Issuance Time",
+       "ar": "زمن إصدار التقارير",
+       "t_en": "≤ 10 days after fieldwork and < 5 days after management response",
+       "t_ar": "≤ 10 أيام بعد العمل الميداني، وأقل من 5 أيام بعد رد الإدارة",
+       "m_en": "Report dates",
+       "m_ar": "تواريخ التقارير",
+       "f_en": "Per audit",
+       "f_ar": "لكل تدقيق",
+       "w": 10
+      },
+      {
+       "en": "Follow-up on Agreed Actions and Time Frames",
+       "ar": "متابعة الإجراءات المتفق عليها ومواعيدها",
+       "t_en": "100% of due actions followed up within 30 days; high-risk actions validated by re-testing",
+       "t_ar": "متابعة 100% من الإجراءات المستحقة خلال 30 يوماً، والتحقق من الإجراءات عالية المخاطر بإعادة الاختبار",
+       "m_en": "Follow-up register",
+       "m_ar": "سجل المتابعة",
+       "f_en": "Quarterly",
+       "f_ar": "ربع سنوي",
+       "w": 15
+      },
+      {
+       "en": "Surprise Count Coverage",
+       "ar": "تغطية الجرد المفاجئ",
+       "t_en": "100% of scheduled cash, vehicle and spare parts counts per year",
+       "t_ar": "تنفيذ 100% من عمليات الجرد المجدولة للنقد والمركبات وقطع الغيار سنوياً",
+       "m_en": "Count records",
+       "m_ar": "سجلات الجرد",
+       "f_en": "Quarterly",
+       "f_ar": "ربع سنوي",
+       "w": 10
+      },
+      {
+       "en": "Finding Accuracy",
+       "ar": "دقة الملاحظات",
+       "t_en": "> 90% quality review score; findings supported by evidence",
+       "t_ar": "درجة مراجعة جودة أعلى من 90%، وملاحظات مدعومة بالأدلة",
+       "m_en": "Internal Audit Manager review",
+       "m_ar": "مراجعة مدير التدقيق الداخلي",
+       "f_en": "Per audit",
+       "f_ar": "لكل تدقيق",
+       "w": 20
+      },
+      {
+       "en": "Confidential Handling of Investigations",
+       "ar": "السرية في التعامل مع التحقيقات",
+       "t_en": "100% of investigation cases handled confidentially",
+       "t_ar": "التعامل بسرية مع 100% من حالات التحقيق",
+       "m_en": "Restricted investigation case register",
+       "m_ar": "سجل حالات التحقيق المقيّد",
+       "f_en": "Per case",
+       "f_ar": "لكل حالة",
+       "w": 10
+      },
+      {
+       "en": "Professional Competence & Analytics",
+       "ar": "الكفاءة المهنية وتحليل البيانات",
+       "t_en": "≥ 40 hours; annual standards self-assessment; analytics used in ≥ 50% of audits",
+       "t_ar": "≥ 40 ساعة؛ تقييم ذاتي سنوي للالتزام بالمعايير؛ استخدام تحليل البيانات في ≥ 50% من عمليات التدقيق",
+       "m_en": "Audit files",
+       "m_ar": "ملفات التدقيق",
+       "f_en": "Annual",
+       "f_ar": "سنوي",
+       "w": 10
+      },
+      {
+       "en": "Annual Risk Assessment & Advisory",
+       "ar": "التقييم السنوي للمخاطر والاستشارات",
+       "t_en": "Plan approved by CEO/Board by 31 Jan; advisory requests answered by agreed dates",
+       "t_ar": "اعتماد الخطة من الرئيس التنفيذي / مجلس الإدارة قبل 31 كانون الثاني، والرد على طلبات الاستشارة ضمن المواعيد المتفق عليها",
+       "m_en": "Approval record; advisory log",
+       "m_ar": "سجل الاعتماد؛ سجل الاستشارات",
+       "f_en": "Annual",
+       "f_ar": "سنوي",
+       "w": 5
+      }
+     ],
+     "tech": [
+      [
+       "Internal audit standards (IIA) and methodology",
+       "معايير التدقيق الداخلي (IIA) ومنهجيته"
+      ],
+      [
+       "Risk assessment and control testing",
+       "تقييم المخاطر واختبار الضوابط"
+      ],
+      [
+       "Forensic and fraud investigation techniques",
+       "أساليب التدقيق الجنائي والتحقيق في الاحتيال"
+      ],
+      [
+       "Financial statement and inventory auditing",
+       "تدقيق القوائم المالية والمخزون"
+      ],
+      [
+       "Iraqi regulatory and tax compliance",
+       "الامتثال التنظيمي والضريبي العراقي"
+      ],
+      [
+       "Data analytics and sampling",
+       "تحليل البيانات وأخذ العينات"
+      ],
+      [
+       "Audit reporting",
+       "إعداد تقارير التدقيق"
+      ],
+      [
+       "Microsoft Excel and Power BI or available analytics tools",
+       "برنامج Microsoft Excel وPower BI أو أدوات التحليل المتاحة"
+      ],
+      [
+       "Sales-to-cash / order-to-cash cycle",
+       "دورة المبيعات حتى التحصيل (Order-to-Cash)"
+      ]
+     ],
+     "ov": {
+      "Reports To": [
+       "Internal Audit Manager and Ali Al Obaidi (CEO) / Board",
+       "مدير التدقيق الداخلي وعلي العبيدي (الرئيس التنفيذي) / مجلس الإدارة"
+      ]
+     }
+    }
+   }
+  ]
  }
 ]
