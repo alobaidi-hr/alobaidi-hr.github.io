@@ -530,11 +530,17 @@ const R = {
     if (archived !== undefined) all[id].archived = !!archived;
     await setJSON('evals', all); return {};
   },
-  async deleteEval({ token, id }) {
+  async deleteEval({ token, id, reason }) {
     const me = await admin(token), all = await evals(); if (!all[id]) err('not_found', 'التقييم غير موجود');
-    const w0 = all[id].wf || {}; if (all[id].recordRef || w0.round > 0 || ['done', 'cancelled', 'gm', 'ceo'].includes(w0.stage)) err('locked', 'لا تُحذف استمارة أُحيلت للاعتماد أو اعتُمدت أو أُلغيت؛ تبقى بياناتها وسجلها. استخدم «إلغاء» مع السبب.');
-    const t = await getJSON('trash', {}); t[id] = { ...all[id], deleted: now(), deletedBy: me.email }; delete all[id];
-    await setJSON('trash', t); await setJSON('evals', all); return {};
+    const r = all[id], w0 = r.wf || {}, guarded = !!r.recordRef || w0.round > 0 || ['done', 'cancelled', 'ops', 'gm', 'ceo'].includes(w0.stage);
+    /* a form that was forwarded, approved, cancelled or archived: only the system owner deletes it, with a reason; it goes to the bin and can be restored */
+    if (guarded && !isOwner(me.u)) err('locked', 'لا تُحذف استمارة أُحيلت للاعتماد أو اعتُمدت أو أُلغيت إلا من مالك النظام. استخدم «إلغاء» مع السبب.');
+    if (guarded) reason = needReason(reason);
+    const ts = now(), who = { name: me.u.name, email: me.email, cap: capOf(me.u) };
+    if (r.wf) logAct(r, who, 'deleted', { reason: reason || '', stFrom: w0.stage, stTo: 'deleted' });
+    if (r.recordRef) { const idx = await recIndex(), it = idx.items[r.recordRef]; if (it) { it.sourceDeleted = { at: ts, by: me.u.name, email: me.email, reason }; await setJSON('records', idx); } }
+    const t = await getJSON('trash', {}); t[id] = { ...r, deleted: ts, deletedBy: me.email, deletedReason: reason || '' }; delete all[id];
+    await setJSON('trash', t); await setJSON('evals', all); await logVisit(me.email, me.u.name, 'eval-delete', id + (reason ? ' ' + reason.slice(0, 60) : '')); return {};
   },
   async saveJob({ token, job, isNew }) {
     await loadData(); const j = cleanJob(job || {}); await editor(token, 'jd', [j.dept, JOBS[j.code] && JOBS[j.code].dept]);
@@ -745,7 +751,8 @@ const R = {
   async restoreEval({ token, id }) {
     await admin(token); const t = await getJSON('trash', {}), all = await evals(); if (!t[id]) err('not_found', 'التقييم غير موجود في السلة');
     if (all[id]) err('exists', 'يوجد تقييم أحدث لنفس الموظف والنوع والفترة — احذفه أولاً ثم استرجع هذا');
-    const r = { ...t[id] }; delete r.deleted; delete r.deletedBy; all[id] = r; delete t[id];
+    const r = { ...t[id] }; delete r.deleted; delete r.deletedBy; delete r.deletedReason; all[id] = r; delete t[id];
+    if (r.recordRef) { const idx = await recIndex(), it = idx.items[r.recordRef]; if (it && it.sourceDeleted) { delete it.sourceDeleted; await setJSON('records', idx); } }
     await setJSON('evals', all); await setJSON('trash', t); return { eval: r };
   },
   async purgeEval({ token, id }) {
