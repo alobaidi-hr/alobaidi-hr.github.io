@@ -397,6 +397,11 @@ async function recReader(token) {
 }
 const recSummary = (x) => ({ ...x, exec: { ...x.exec, status: execNow(x) }, notesOpen: (x.notes || []).filter((n) => n.status !== 'closed').length });
 
+/* a permanently deleted form leaves only who, when and why (no content) */
+async function tombstone(r, me, reason) {
+  const l = await getJSON('purged', []); l.push({ id: r.id, emp: { id: r.emp.id, name: r.emp.name }, type: r.type, period: r.period, stage: r.wf && r.wf.stage, recordRef: r.recordRef || '', at: now(), by: me.u.name, email: me.email, reason: reason || '' });
+  await setJSON('purged', l.slice(-2000));
+}
 /* ---------- routes ---------- */
 const R = {
   async branding() { return { settings: publicSettings(await settings()) }; },
@@ -530,15 +535,17 @@ const R = {
     if (archived !== undefined) all[id].archived = !!archived;
     await setJSON('evals', all); return {};
   },
-  async deleteEval({ token, id, reason }) {
+  async deleteEval({ token, id, reason, permanent }) {
     const me = await admin(token), all = await evals(); if (!all[id]) err('not_found', 'التقييم غير موجود');
     const r = all[id], w0 = r.wf || {}, guarded = !!r.recordRef || w0.round > 0 || ['done', 'cancelled', 'ops', 'gm', 'ceo'].includes(w0.stage);
     /* a form that was forwarded, approved, cancelled or archived: only the system owner deletes it, with a reason; it goes to the bin and can be restored */
     if (guarded && !isOwner(me.u)) err('locked', 'لا تُحذف استمارة أُحيلت للاعتماد أو اعتُمدت أو أُلغيت إلا من مالك النظام. استخدم «إلغاء» مع السبب.');
-    if (guarded) reason = needReason(reason);
+    if (permanent && !isOwner(me.u)) err('forbidden', 'الحذف النهائي لمالك النظام فقط');
+    if (guarded || permanent) reason = needReason(reason);
     const ts = now(), who = { name: me.u.name, email: me.email, cap: capOf(me.u) };
     if (r.wf) logAct(r, who, 'deleted', { reason: reason || '', stFrom: w0.stage, stTo: 'deleted' });
-    if (r.recordRef) { const idx = await recIndex(), it = idx.items[r.recordRef]; if (it) { it.sourceDeleted = { at: ts, by: me.u.name, email: me.email, reason }; await setJSON('records', idx); } }
+    if (r.recordRef) { const idx = await recIndex(), it = idx.items[r.recordRef]; if (it) { it.sourceDeleted = { at: ts, by: me.u.name, email: me.email, reason, permanent: !!permanent }; await setJSON('records', idx); } }
+    if (permanent) { await tombstone(r, me, reason); delete all[id]; await setJSON('evals', all); await logVisit(me.email, me.u.name, 'eval-purge', id + ' ' + reason.slice(0, 60)); return {}; }
     const t = await getJSON('trash', {}); t[id] = { ...r, deleted: ts, deletedBy: me.email, deletedReason: reason || '' }; delete all[id];
     await setJSON('trash', t); await setJSON('evals', all); await logVisit(me.email, me.u.name, 'eval-delete', id + (reason ? ' ' + reason.slice(0, 60) : '')); return {};
   },
@@ -694,7 +701,7 @@ const R = {
     const needSig = () => { if (!sig) err('invalid', 'التوقيع الإلكتروني مطلوب'); };
     /* an approval is bound to the version and round it reviewed */
     const bound = () => { if (Number(v) !== r.v || Number(round) !== r.wf.round) err('stale_version', 'تغيّرت الاستمارة بعد فتحها (النسخة الحالية ' + r.v + '). حدّث الصفحة وراجع النسخة الأخيرة قبل الاعتماد.'); };
-    const inv = involved(r), sep = (list) => { if (list.filter(Boolean).includes(email)) err('forbidden', 'فصل المهام: لا يعتمد من قيّم الموظف أو أحال الاستمارة أو عدّلها أو اعتمدها في مرحلة سابقة'); };
+    const inv = involved(r), sep = (list) => { if (list.filter(Boolean).includes(email)) err('forbidden', 'فصل المهام: لا يعتمد من أحال الاستمارة أو عدّلها أو اعتمدها في مرحلة سابقة'); };
     const mine = (k) => { if (!(r.wf[k] && r.wf[k].email === email)) err('forbidden', 'هذه الاستمارة مسندة إلى ' + ((r.wf[k] && r.wf[k].name) || 'شخص آخر')); };
     const clear = (...ks) => { for (const k of ks) delete r.wf.sig[k]; };
     if (act === 'paper_ack') {
@@ -718,9 +725,9 @@ const R = {
     } else if (act === 'hr_return') { need(['hr'], ['admin']); r.wf.stage = 'returned'; r.wf.sig = { mgr: r.wf.sig.mgr }; }
     else if (act === 'ops_approve') { need(['ops'], ['ops']); mine('ops'); bound(); sep([inv.evaluator, inv.head, inv.forwarder, ...inv.editors]); needSig(); pushSig(r, 'ops', who); r.wf.stage = 'gm'; }
     else if (act === 'ops_return') { need(['ops'], ['ops']); mine('ops'); r.wf.stage = 'hr'; clear('hr', 'ops'); }
-    else if (act === 'gm_approve') { need(['gm'], ['gm']); bound(); sep([inv.evaluator, inv.head, inv.forwarder, inv.ops, ...inv.editors]); needSig(); pushSig(r, 'gm', who); r.wf.stage = r.wf.ceo ? 'ceo' : 'done'; }
+    else if (act === 'gm_approve') { need(['gm'], ['gm']); bound(); sep([inv.head, inv.forwarder, inv.ops, ...inv.editors]); needSig(); pushSig(r, 'gm', who); r.wf.stage = r.wf.ceo ? 'ceo' : 'done'; }
     else if (act === 'gm_return') { need(['gm'], ['gm']); r.wf.stage = 'hr'; clear('hr', 'ops'); }
-    else if (act === 'ceo_approve') { need(['ceo'], ['ceo']); bound(); sep([inv.evaluator, inv.head, inv.forwarder, inv.ops, inv.gm, ...inv.editors]); needSig(); pushSig(r, 'ceo', who); r.wf.stage = 'done'; }
+    else if (act === 'ceo_approve') { need(['ceo'], ['ceo']); bound(); sep([inv.head, inv.forwarder, inv.ops, inv.gm, ...inv.editors]); needSig(); pushSig(r, 'ceo', who); r.wf.stage = 'done'; }
     else if (act === 'ceo_return') { need(['ceo'], ['ceo']); r.wf.stage = 'hr'; clear('hr', 'ops', 'gm'); }
     else if (act === 'set_ceo') { need(['hr', 'employee', 'head'], ['admin']); if (ceo && !(await chainCfg()).ceo) err('invalid', 'مصادقة الرئيس التنفيذي معطّلة من مالك النظام'); r.wf.ceo = !!ceo; }
     else err('bad_action', 'إجراء غير معروف');
@@ -756,9 +763,11 @@ const R = {
     await setJSON('evals', all); await setJSON('trash', t); return { eval: r };
   },
   async purgeEval({ token, id }) {
-    await admin(token); let t = await getJSON('trash', {});
-    if (id === '*') t = {}; else { if (!t[id]) err('not_found', 'التقييم غير موجود في السلة'); delete t[id]; }
-    await setJSON('trash', t); return {};
+    const me = await admin(token); if (!isOwner(me.u)) err('forbidden', 'الحذف النهائي لمالك النظام فقط'); let t = await getJSON('trash', {});
+    const gone = id === '*' ? Object.values(t) : t[id] ? [t[id]] : null; if (!gone) err('not_found', 'التقييم غير موجود في السلة');
+    for (const r of gone) { await tombstone(r, me, r.deletedReason || 'حذف نهائي من سلة المحذوفات'); delete t[r.id]; }
+    if (gone.some((r) => r.recordRef)) { const idx = await recIndex(); for (const r of gone) { const it = r.recordRef && idx.items[r.recordRef]; if (it) it.sourceDeleted = { ...(it.sourceDeleted || { at: now(), by: me.u.name, reason: r.deletedReason || '' }), permanent: true }; } await setJSON('records', idx); }
+    await setJSON('trash', t); await logVisit(me.email, me.u.name, 'eval-purge', id === '*' ? 'all ' + gone.length : id); return {};
   },
 
   /* ---------- v3: exchange rate, raise preview ---------- */
