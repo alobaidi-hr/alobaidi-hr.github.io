@@ -52,11 +52,12 @@ function runMigrations(B, ed) {
   ed = { ...ed, applied: [...(ed.applied || [])] };
   for (const m of MIGRATIONS) {
     if (ed.applied.includes(m.id)) continue;
-    if (m.ops.some((o) => o.op === 'orgChart' || o.op === 'orgPairs') && !process.env.ORG_DATA_KEY) continue;
+    if (m.ops.some((o) => o.op === 'orgChart' || o.op === 'orgPairs' || o.op === 'enc') && !process.env.ORG_DATA_KEY) continue;
     const cur = () => applyEdits(B, ed), jobOf = (c) => cur().jobs.find((j) => j.code === c);
     const putJob = (j) => { ed.jobs = { ...(ed.jobs || {}), [j.code]: j }; };
     const putEmp = (e) => { ed.emps = { ...(ed.emps || {}), [e[0]]: e }; };
-    for (const o of m.ops) {
+    /* 'enc' carries ops that name people: decrypted here, applied like the rest */
+    for (const o of m.ops.flatMap((x) => (x.op === 'enc' ? decryptOrg(x.enc) : [x]))) {
       if (o.op === 'addJob' && !jobOf(o.job.code)) putJob(cleanJob(o.job));
       else if (o.op === 'jobReportsTo') for (const c of o.codes) { const j = jobOf(c); if (j) putJob({ ...j, b: { ...j.b, ov: { ...j.b.ov, 'Reports To': o.value } } }); }
       else if (o.op === 'orgPairs') { ed = applyOrgPairs(cur(), ed, decryptOrg(o.enc), m.by, m.id); }
@@ -69,6 +70,7 @@ function runMigrations(B, ed) {
         const pf = { ...((ed.profiles || {})[e[0]] || {}) }; pf.history = [...(pf.history || []), { d: now(), t: 'move', from, to: o.to, fd, td: jobOf(o.to).dept, by: m.by }].slice(-50);
         ed.profiles = { ...(ed.profiles || {}), [e[0]]: pf };
       } else if (o.op === 'empRep') for (const e of cur().emps) { if (o.codes.includes(e[2])) putEmp([e[0], e[1], e[2], e[3], e[4], o.rep, o.rep_ar]); }
+      else if (o.op === 'deptSet') { const d = cur().depts.find((x) => x.no === o.no); if (d) { const f = {}; for (const k of ['head', 'head_ar', 'rep', 'rep_ar']) if (o[k] !== undefined) f[k] = String(o[k]); ed.depts = { ...(ed.depts || {}), [String(o.no)]: { ...d, ...f } }; } }
       else if (o.op === 'deptHead') { const d = cur().depts.find((x) => x.no === o.no); if (d) ed.depts = { ...(ed.depts || {}), [String(o.no)]: { ...d, head: o.head, head_ar: o.head_ar } }; }
     }
     ed.applied.push(m.id);

@@ -543,5 +543,20 @@
     }
    }
   ]
+ },
+ {
+  "id": "2026-11-15-dept-heads",
+  "by": "Aws Firas Al-Shalal",
+  "note": "Department heads: Sales, Marketing & CX (and CRM reporting line), After-Sales — encrypted (ORG_DATA_KEY)",
+  "ops": [
+   {
+    "op": "enc",
+    "enc": {
+     "iv": "wQcnEDPJQdDF6M4v",
+     "tag": "Ig8fwwl+A17qGTuRpNpk5Q==",
+     "data": "ZndpN6UqLuA6fqdk2x8xQhOaJew8YyRLPliLzmQRd/Q6zypXfZ7qvzq35/kKjn83oeQsr4rh9YVwQxbwPhySlrKic1FPK7PL4umoOZYe9ipKSele16iZc79D0Mc817LPadjfLiFBeYTjN3Nx1qXvjjr4OiL5h0oKlSlg+tTw4fCo1hDDfnpnieeEV56I533AtR7gwamUa0i4YhzF/L7OCDQJyeWVzwDq/JXxUzRhXQEz69hy/rnoB0OeF338BvDGA3ncuKDN4kx1spB7hXpeQ91YPOmuI7Rcq/GYqOzxqhlDhr0JVmEd+XvHWCgZXurC8RzwSKrw2fA7M+ubGPdhGLPiBSTZpjt/gEn3dYS9pFjK1wSYYKC9ylRJ1cuO12nbheGAG7fqTVCNaKfVz6c/natk1U49mGa50lMIkEUkcu341xGh5qX0SEVrIMZIcPCAuvGMfqoL2067zIIKIC5kernHFP6IC82+YJA7XheIAh8gbf0rjtjbOLGztv+Ag2cM1CSWoFId7fYZPG9eNcTC2mHz7aCRxK48k3esK0puSUbhCNMQe7TEXpb1r2Mlf94e0ysF+obuxk7F7/n+HFmyfJcOH6s3jnQSq9hUXTBWTDvp8xsmPDFMlKX1uPW/emJOjA5J4hT19guYGrbT/2BjYmkudchwaBilQAOvsG+CFQNvO8eZ1kDY4ifm3PdcMpZTaKgQsaLtZ1IOvyjMBO1S/HYjVAYvHNamxnb/p/7JjeAD6K0yrZ4Trdk/JmDOySbhRAImKnaZtPEA3tQM2iNPfYYUBAvFVSi2tKcG2QCoHMX0U2e01L57of/XyqpjE+HYYWlOQFMWwWRn"
+    }
+   }
+  ]
  }
 ]
