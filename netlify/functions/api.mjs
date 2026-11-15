@@ -70,6 +70,13 @@ function runMigrations(B, ed) {
         const pf = { ...((ed.profiles || {})[e[0]] || {}) }; pf.history = [...(pf.history || []), { d: now(), t: 'move', from, to: o.to, fd, td: jobOf(o.to).dept, by: m.by }].slice(-50);
         ed.profiles = { ...(ed.profiles || {}), [e[0]]: pf };
       } else if (o.op === 'empRep') for (const e of cur().emps) { if (o.codes.includes(e[2])) putEmp([e[0], e[1], e[2], e[3], e[4], o.rep, o.rep_ar]); }
+      else if (o.op === 'renumberEmp') {
+        const all = cur().emps, e = all.find((x) => x[0] === o.from); if (!e || all.some((x) => x[0] === o.to)) continue;
+        ed.emps = { ...(ed.emps || {}), [o.to]: [o.to, ...e.slice(1)] }; if (B.emps.some((x) => x[0] === o.from)) ed.emps[o.from] = null; else delete ed.emps[o.from];
+        const pf = { ...((ed.profiles || {})[o.from] || {}) }; pf.history = [...(pf.history || []), { d: now(), t: 'renumber', from: o.from, to: o.to, by: m.by }].slice(-50);
+        ed.profiles = { ...(ed.profiles || {}), [o.to]: pf }; delete ed.profiles[o.from];
+        for (const [k, v] of Object.entries(ed.profiles)) if (v && v.mgrId === o.from) ed.profiles[k] = { ...v, mgrId: o.to };
+      }
       else if (o.op === 'deptSet') { const d = cur().depts.find((x) => x.no === o.no); if (d) { const f = {}; for (const k of ['head', 'head_ar', 'rep', 'rep_ar']) if (o[k] !== undefined) f[k] = String(o[k]); ed.depts = { ...(ed.depts || {}), [String(o.no)]: { ...d, ...f } }; } }
       else if (o.op === 'deptHead') { const d = cur().depts.find((x) => x.no === o.no); if (d) ed.depts = { ...(ed.depts || {}), [String(o.no)]: { ...d, head: o.head, head_ar: o.head_ar } }; }
     }

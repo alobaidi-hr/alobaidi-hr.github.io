@@ -603,5 +603,17 @@
     }
    }
   ]
+ },
+ {
+  "id": "2026-11-15-renumber-10001",
+  "by": "Aws Firas Al-Shalal",
+  "note": "Employee added with the old numbering gets the company pattern: 10001 -> LAC-BG-122",
+  "ops": [
+   {
+    "op": "renumberEmp",
+    "from": "10001",
+    "to": "LAC-BG-122"
+   }
+  ]
  }
 ]
