@@ -52,13 +52,14 @@ function runMigrations(B, ed) {
   ed = { ...ed, applied: [...(ed.applied || [])] };
   for (const m of MIGRATIONS) {
     if (ed.applied.includes(m.id)) continue;
-    if (m.ops.some((o) => o.op === 'orgChart') && !process.env.ORG_DATA_KEY) continue;
+    if (m.ops.some((o) => o.op === 'orgChart' || o.op === 'orgPairs') && !process.env.ORG_DATA_KEY) continue;
     const cur = () => applyEdits(B, ed), jobOf = (c) => cur().jobs.find((j) => j.code === c);
     const putJob = (j) => { ed.jobs = { ...(ed.jobs || {}), [j.code]: j }; };
     const putEmp = (e) => { ed.emps = { ...(ed.emps || {}), [e[0]]: e }; };
     for (const o of m.ops) {
       if (o.op === 'addJob' && !jobOf(o.job.code)) putJob(cleanJob(o.job));
       else if (o.op === 'jobReportsTo') for (const c of o.codes) { const j = jobOf(c); if (j) putJob({ ...j, b: { ...j.b, ov: { ...j.b.ov, 'Reports To': o.value } } }); }
+      else if (o.op === 'orgPairs') { ed = applyOrgPairs(cur(), ed, decryptOrg(o.enc), m.by, m.id); }
       else if (o.op === 'orgChart') { const prev = ed.orgReport || {}, r = applyOrgChart(cur(), ed, decryptOrg(o.enc), m.by); ed = r.ed; ed.orgReport = { ...r.report, manual: prev.manual || [], id: m.id, at: now() }; }
       else if (o.op === 'jobPatch') { const j = jobOf(o.code); if (j) putJob(cleanJob({ ...j, b: { ...j.b, ...o.b, ov: { ...j.b.ov, ...(o.b.ov || {}) } } })); }
       else if (o.op === 'jobText') { const j = jobOf(o.code); if (j) putJob({ ...j, b: { ...j.b, duties: j.b.duties.map((p) => p.map((t) => String(t).split(o.from).join(o.to))) } }); }
@@ -158,6 +159,27 @@ function applyOrgChart(D, ed, people, by) {
   for (const x of emps) if (!used.has(x.e[0])) report.notInChart.push({ id: x.e[0], name: x.e[1] });
   report.notInChart = report.notInChart.filter((x) => !(ed.profiles[x.id] && ed.profiles[x.id].org === 'manual'));
   return { ed, report };
+}
+/* names HR decided by hand (spellings too far apart for the machine): chart name -> employee number */
+function applyOrgPairs(D, ed, pairs, by, mid) {
+  const src = MIGRATIONS.find((m) => m.ops.some((o) => o.op === 'orgChart'));
+  const people = decryptOrg(src.ops.find((o) => o.op === 'orgChart').enc);
+  ed = { ...ed, emps: { ...(ed.emps || {}) }, profiles: { ...(ed.profiles || {}) } };
+  const R = ed.orgReport = { ...(ed.orgReport || { matched: [], unmatched: [], ambiguous: [], notInChart: [] }) };
+  for (const { n, id } of pairs) {
+    const p = people.find((x) => x.n === n), e = D.emps.find((x) => x[0] === id); if (!p || !e) continue;
+    const pf = { ...(ed.profiles[e[0]] || {}) }; if (pf.org === 'manual') continue;
+    const from = empDeptOf(D, e, pf);
+    Object.assign(pf, { dept: p.d, unit: p.u, unit_en: p.ue, title: p.t, mgr: p.m, lead: !!p.l, org: 'chart' });
+    if (from !== p.d) pf.history = [...(pf.history || []), { d: now(), t: 'org', fd: from, td: p.d, unit: p.u, by }].slice(-50);
+    ed.profiles[e[0]] = pf;
+    if (p.m) { const mp = people.find((x) => x.n === p.m); ed.emps[e[0]] = [e[0], e[1], e[2], e[3], e[4], p.m + (mp ? ' — ' + mp.t : ''), p.m + (mp ? ' — ' + mp.t : '')]; }
+    R.unmatched = (R.unmatched || []).filter((x) => x.n !== n); R.ambiguous = (R.ambiguous || []).filter((x) => x.n !== n);
+    R.notInChart = (R.notInChart || []).filter((x) => x.id !== id);
+    R.matched = (R.matched || []).filter((x) => x.id !== id).concat([{ n, id, name: e[1], d: p.d, u: p.u, s: 'hr', by }]);
+  }
+  R.pairs = mid; R.at = now();
+  return ed;
 }
 const empDeptOf = (D, e, pf) => (pf && pf.dept ? Number(pf.dept) : ((D.jobs.find((j) => j.code === e[2]) || {}).dept || 0));
 function decrypt(pass) {

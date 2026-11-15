@@ -528,5 +528,20 @@
     }
    }
   ]
+ },
+ {
+  "id": "2026-11-15-org-pairs",
+  "by": "Aws Firas Al-Shalal",
+  "note": "Org chart: names matched by HR review (spellings too far apart for automatic matching) — encrypted (ORG_DATA_KEY)",
+  "ops": [
+   {
+    "op": "orgPairs",
+    "enc": {
+     "iv": "0ITw+S04BGQEWh8f",
+     "tag": "Lop6VWStVRbKZAaQ1lKxqg==",
+     "data": "6mfw06jvUZzgQZBEyvAplI+wv8IDBcuryUZ+S4jC7O7oMECELM/7X0aavBLPOY/quT5DMJh7QaDYd77XhLZUrpUx8pl1lCRyMq7/gnJWNQ3MEV2uFV5j4Vb8qntCD7isEzRX0p0E6KSqD6sSrUwqsRXZ46C56XRi+MUQBpMWKdmaHjScw3B1aQKhSkzPm/pEvMkkGdypYAbbGK8DcQspQMRrxpfcD3T1td4SEJVQXduOeRzSzU5b7T8t4lD3Nax4BTvUx+gQexaswzGRg7l3n+FjBSTTgcDCsu87tGGf8w28rqKxBNceg58yeD+Ot5TXpkc804mgH3Zi+D1HRcd8JPnnbYgNER82woTUeBXn74x8cDU0cNyaR1wwJ91R9tIQE/417arnFixJ/XQRuTs2hWSde0hUXJEBcpsi9cei1OmBu+u6OhMskbljgqQpHEwLOP0akezqWs3ffCiZQDANhjRiAS3oiOEd8+v8TCmqtFwSicVjeuX+sPyoyg=="
+    }
+   }
+  ]
  }
 ]
