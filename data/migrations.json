@@ -573,5 +573,20 @@
     }
    }
   ]
+ },
+ {
+  "id": "2026-11-15-sales-ops-manager",
+  "by": "Aws Firas Al-Shalal",
+  "note": "Sales: the final reference of every sales team is the Operations Manager — encrypted (ORG_DATA_KEY)",
+  "ops": [
+   {
+    "op": "enc",
+    "enc": {
+     "iv": "yQQwbVFLuZP5b49K",
+     "tag": "8XzytHQpQ6SfP1zapdW7sw==",
+     "data": "soPEe5PjHm93Yeu9aN4AhPjy8AZvnM4u6tK37axR91qchu+Wm8VopVsfgfAIt8Pe4kbvj8N1UWfvZ1D0YBeN1sTtvoHYVqUMfIfkhTjjndE2ynhm9bpiyDkkDn5XEAhY+7sxGwtzI80Q05lT4+EfVIgPLkWFPzLQelN6XQjRIY7v6ib/DvL+Z3gsouBERXK5ztVCu8ScazBWL4arex8644JYZF6cHFzqJmqVWLYdDNCWY04AHhe03lvfRz+xnbHx9a22GTZhAPn/Fgi20JMeKcr9wb6RyHvzsPGpSngH2riIdhM/w+XqpM103tfGFKTEfYAcIaFkgqOXua0IKRaW5MPhYUIkFogYC/QZ3rrOSbJAqWFyCBQUNM7soD85is2PpyjgyeJD+fIF36WB6WaD/TxB1FJBKKQjJTkF5iohmlrtpnFPfRInA246qMT309C2k202ThQg+0K72Gcm8LI="
+    }
+   }
+  ]
  }
 ]
