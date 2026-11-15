@@ -930,13 +930,14 @@ const R = {
     const d = String(file.data || ''); if (!/^data:(application\/pdf|image\/(jpeg|png|webp));base64,/.test(d)) err('invalid', 'الصيغ المقبولة: PDF أو صورة');
     if (d.length > 5_500_000) err('too_large', 'الملف أكبر من 4 ميغابايت — صغّره أو قسّمه');
     const all = await evals(), e = file.empId ? SEED.emps.find((x) => x[0] === String(file.empId)) : null; if (file.empId && !e) err('invalid', 'الموظف غير موجود');
-    const ev = file.evalId ? all[String(file.evalId)] : null; if (file.evalId && !ev) err('invalid', 'الاستمارة غير موجودة');
+    const kind = file.kind === 'jd' ? 'jd' : file.evalId ? 'eval' : 'other';
+    const ev = kind !== 'jd' && file.evalId ? all[String(file.evalId)] : null; if (kind !== 'jd' && file.evalId && !ev) err('invalid', 'الاستمارة غير موجودة');
     if (ev && e && ev.emp.id !== e[0]) err('invalid', 'الاستمارة لا تخص هذا الموظف');
     const emp = e || (ev ? SEED.emps.find((x) => x[0] === ev.emp.id) : null);
     const id = 'SD' + crypto.randomBytes(5).toString('hex').toUpperCase(), ts = now();
     await setJSON('sdoc/' + id, { d });
     const item = { id, file: String(file.name || '').slice(0, 160), mime: d.slice(5, d.indexOf(';')), size: Math.round(d.length * 0.75), at: ts, by: u.name, email,
-      empId: emp ? emp[0] : '', empName: emp ? emp[1] : '', evalId: ev ? ev.id : '', period: ev ? ev.period : '', type: ev ? ev.type : '', how: ['filename', 'ocr', 'manual'].includes(file.how) ? file.how : emp ? 'manual' : '' };
+      kind, empId: emp ? emp[0] : '', empName: emp ? emp[1] : '', evalId: ev ? ev.id : '', period: ev ? ev.period : '', type: ev ? ev.type : '', how: ['filename', 'ocr', 'manual'].includes(file.how) ? file.how : emp ? 'manual' : '' };
     const idx = await getJSON('signed', {}); idx[id] = item; await setJSON('signed', idx);
     if (ev) { ev.paper = { doc: id, at: ts, by: u.name }; ev.wf && logAct(ev, { name: u.name, email, cap: capOf(u) }, 'paper_signed', { note: item.file }); await setJSON('evals', all); }
     await logVisit(email, u.name, 'signed-upload', id + ' ' + (item.empId || 'unassigned')); return { item };
@@ -949,7 +950,7 @@ const R = {
   async signedAssign({ token, id, empId, evalId }) {
     await loadData(); const { email, u } = await admin(token), idx = await getJSON('signed', {}), it = idx[id]; if (!it) err('not_found', 'الملف غير موجود');
     const all = await evals(), e = SEED.emps.find((x) => x[0] === String(empId)); if (!e) err('invalid', 'الموظف غير موجود');
-    const ev = evalId ? all[String(evalId)] : null; if (evalId && (!ev || ev.emp.id !== e[0])) err('invalid', 'الاستمارة لا تخص هذا الموظف');
+    const ev = evalId && it.kind !== 'jd' ? all[String(evalId)] : null; if (evalId && it.kind !== 'jd' && (!ev || ev.emp.id !== e[0])) err('invalid', 'الاستمارة لا تخص هذا الموظف');
     if (it.evalId && all[it.evalId] && all[it.evalId].paper && all[it.evalId].paper.doc === id) delete all[it.evalId].paper;
     Object.assign(it, { empId: e[0], empName: e[1], evalId: ev ? ev.id : '', period: ev ? ev.period : '', type: ev ? ev.type : '', how: 'manual', assignedBy: u.name, assignedAt: now() });
     if (ev) ev.paper = { doc: id, at: now(), by: u.name };

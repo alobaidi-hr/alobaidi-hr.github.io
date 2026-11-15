@@ -1791,7 +1791,7 @@ function jdPaper(j, emp) {
       if (rt[1] || rt[0]) l.push(['المرجع المباشر', 'Reports to', rt[1] || rt[0], '']);
       if (hd[0] && hd[0] !== (rt[1] || rt[0])) l.push(['رئيس القسم', 'Head of department', hd[0], hd[1]]);
       l.push(['مدير الموارد البشرية', 'HR Manager', 'أوس فراس الشلال', 'Aws Firas Al-Shalal'], ['الاعتماد — المدير العام', 'Approval — General Manager', '', '']);
-      return sigBoxes(l); })() + paperFoot() + '</div>';
+      return sigBoxes(l); })() + (emp ? '<div class="formcode"><span style="font-size:10.5px">بعد التوقيع يُرفع هذا الوصف في «مكتبة الاستمارات الموقّعة» ويُحفظ تلقائياً في ملف الموظف بهذا الرمز.<br><span class="en">Upload the signed copy to the Signed Forms Library — it is filed by this code.</span></span><span class="code">JD · ' + esc(emp[0]) + '</span></div>' : '') + paperFoot() + '</div>';
 }
 function printPapers(htmls) {
   if (window.LO_PRINT) return window.LO_PRINT(htmls);
@@ -2209,6 +2209,7 @@ function normId(s) { return String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, 
 /* who is this file? the form code, then the employee number, then the name — in the file name or in the scanned text */
 function matchText(txt) {
   var T = String(txt || ''), U = T.toUpperCase(), all = (S.inbox || []).concat(S.evals || []);
+  if (/JOB\s*DESCRIPTION|الوصف الوظيفي|(^|[^A-Z])JD([^A-Z]|$)/.test(U)) { var hj = matchEmpOnly(T, U); return hj ? { empId: hj.empId, kind: 'jd', why: 'وصف وظيفي — ' + hj.why } : null; }
   var m = U.match(/HR[\s\-_]*EVAL[\s\-_]*([0-9A-F]{10})/) || U.match(/\b([0-9A-F]{10})\b/);
   if (m) { var ev = all.filter(function (x) { return x.id === m[1]; })[0]; if (ev) return { empId: ev.emp.id, evalId: ev.id, why: 'رمز الاستمارة ' + ev.id }; }
   var nu = normId(U), ids = Object.keys(EMP).sort(function (a, b) { return b.length - a.length; });
@@ -2217,6 +2218,12 @@ function matchText(txt) {
   var byName = S.data.emps.filter(function (e) { return e[1].length > 6 && low.indexOf(e[1].toLowerCase()) >= 0; });
   if (byName.length === 1) return { empId: byName[0][0], why: 'الاسم' };
   return null;
+}
+function matchEmpOnly(T, U) {
+  var nu = normId(U), ids = Object.keys(EMP).sort(function (a, b) { return b.length - a.length; });
+  for (var i = 0; i < ids.length; i++) { var k = normId(ids[i]); if (k.length >= 4 && nu.indexOf(k) >= 0) return { empId: ids[i], why: 'الرقم الوظيفي ' + ids[i] }; }
+  var low = T.toLowerCase().replace(/[_\-.]+/g, ' '), byName = S.data.emps.filter(function (e) { return e[1].length > 6 && low.indexOf(e[1].toLowerCase()) >= 0; });
+  return byName.length === 1 ? { empId: byName[0][0], why: 'الاسم' } : null;
 }
 function latestEval(empId) { var all = (S.inbox || []).concat(S.evals || []).filter(function (x) { return x.emp.id === empId && x.wf && x.wf.stage !== 'cancelled'; }); all.sort(function (a, b) { return a.updated < b.updated ? 1 : -1; }); return all[0] || null; }
 function fileData(f) { return new Promise(function (res, rej) { var r = new FileReader(); r.onload = function () { res(r.result); }; r.onerror = rej; r.readAsDataURL(f); }); }
@@ -2236,7 +2243,7 @@ function ocrFile(f) {
 VIEWS.signed = function (v) {
   if (!isAdmin()) { location.hash = '#/home'; return; }
   var Q = [], list = [], q = '';
-  v.innerHTML = head('مكتبة الاستمارات الموقّعة', 'ارفع الاستمارات بعد توقيع الموظف ومدير القسم — يقرأ النظام رمز الاستمارة أو الرقم الوظيفي ويحفظ كل ملف في ملف صاحبه', '', '<button class="btn sec" id="sgr">' + ic('refresh') + 'تحديث</button>') +
+  v.innerHTML = head('مكتبة الاستمارات الموقّعة', 'ارفع استمارات التقييم والأوصاف الوظيفية بعد التوقيع — يقرأ النظام رمز الاستمارة أو الرقم الوظيفي ويحفظ كل ملف في ملف صاحبه', '', '<button class="btn sec" id="sgr">' + ic('refresh') + 'تحديث</button>') +
     '<div class="drop" id="sdz"><div style="font-size:15px;font-weight:700">' + ic('up').replace('<svg', '<svg width="22" height="22"') + ' اسحب الملفات هنا أو اضغط للاختيار</div><div class="muted" style="font-size:12.5px;margin-top:6px">PDF أو صور (ماسح ضوئي أو كاميرا الهاتف) · ملفات كثيرة دفعة واحدة · يُفضَّل أن يتضمن اسم الملف الرقم الوظيفي، وإلا يقرأ النظام رمز الاستمارة من الصفحة</div><input type="file" id="sfi" multiple accept="application/pdf,image/*" hidden></div>' +
     '<div id="sq" style="margin-top:12px"></div><div class="card" style="margin-top:14px"><div class="hd"><h2>الاستمارات المحفوظة</h2><input class="inp" id="sgq" type="search" placeholder="بحث بالاسم أو الرقم" style="max-width:260px"></div><div class="bd" id="sgl"><div class="loading" style="min-height:14vh"><div class="spin"></div></div></div></div>';
   var empOpts = function (sel) { return '<option value="">— اختر الموظف —</option>' + S.data.emps.slice().sort(function (a, b) { return a[1] < b[1] ? -1 : 1; }).map(function (e) { return '<option value="' + esc(e[0]) + '"' + (e[0] === sel ? ' selected' : '') + '>' + esc(e[1]) + ' · ' + esc(e[0]) + '</option>'; }).join(''); };
@@ -2248,15 +2255,15 @@ VIEWS.signed = function (v) {
   };
   var upload = function (x, how) {
     x.st = 'up'; drawQ();
-    var ev = x.evalId ? null : latestEval(x.empId);
-    return (x.f.type === 'application/pdf' ? fileData(x.f) : shrinkImage(x.f)).then(function (d) { return api('signedUpload', { file: { name: x.f.name, data: d, empId: x.empId, evalId: x.evalId || (ev && ev.id) || '', how: how } }); })
+    var ev = x.evalId || x.kind === 'jd' ? null : latestEval(x.empId);
+    return (x.f.type === 'application/pdf' ? fileData(x.f) : shrinkImage(x.f)).then(function (d) { return api('signedUpload', { file: { name: x.f.name, data: d, empId: x.empId, evalId: x.kind === 'jd' ? '' : (x.evalId || (ev && ev.id) || ''), kind: x.kind || '', how: how } }); })
       .then(function (r) { x.st = 'done'; x.empName = r.item.empName; drawQ(); load(); }).catch(function (e) { x.st = 'fail'; x.err = e.message; drawQ(); });
   };
   var run = function () {
     var next = Q.filter(function (x) { return x.st === 'wait'; })[0]; if (!next) return;
     var hit = matchText(next.f.name);
     var go = hit ? Promise.resolve([hit, 'filename']) : (next.st = 'read', drawQ(), ocrFile(next.f).then(function (t) { var h = matchText(t); return [h, 'ocr']; }).catch(function () { return [null, '']; }));
-    go.then(function (r) { if (r[0]) { next.empId = r[0].empId; next.evalId = r[0].evalId || ''; next.why = r[0].why + (r[1] === 'ocr' ? ' (من الصفحة)' : ' (من اسم الملف)'); return upload(next, r[1]); } next.st = 'need'; drawQ(); }).then(run);
+    go.then(function (r) { if (r[0]) { next.empId = r[0].empId; next.evalId = r[0].evalId || ''; next.kind = r[0].kind || ''; next.why = r[0].why + (r[1] === 'ocr' ? ' (من الصفحة)' : ' (من اسم الملف)'); return upload(next, r[1]); } next.st = 'need'; drawQ(); }).then(run);
   };
   var add = function (files) { Array.prototype.forEach.call(files, function (f) { if (f.size > 12 * 1024 * 1024) { Q.push({ f: f, st: 'fail', err: 'أكبر من 12MB' }); return; } Q.push({ f: f, st: 'wait' }); }); drawQ(); run(); };
   var dz = $('#sdz'); dz.onclick = function () { $('#sfi').click(); }; $('#sfi').onchange = function () { add(this.files); this.value = ''; };
@@ -2266,7 +2273,7 @@ VIEWS.signed = function (v) {
   var drawL = function () {
     var l = list.filter(function (x) { return !q || (x.empName + ' ' + x.empId + ' ' + x.file).toLowerCase().indexOf(q) >= 0; });
     $('#sgl').innerHTML = l.length ? '<div class="tw"><table class="t minw"><thead><tr><th>الموظف</th><th>الاستمارة</th><th>الملف</th><th>طريقة التوزيع</th><th>رُفع</th><th></th></tr></thead><tbody>' + l.map(function (x) {
-      return '<tr><td>' + (x.empId ? '<a href="#/emp/' + encodeURIComponent(x.empId) + '"><b>' + esc(x.empName) + '</b></a><div class="num muted" style="font-size:11px">' + esc(x.empId) + '</div>' : '<span class="pill r0">غير موزّع</span>') + '</td><td>' + (x.evalId ? (TYPE[x.type] ? TYPE[x.type][1] : '') + ' <span class="num">' + esc(x.period) + '</span>' : '<span class="muted">—</span>') + '</td><td style="font-size:12px">' + esc(x.file) + '<div class="muted num">' + Math.round(x.size / 1024) + ' KB</div></td><td>' + ({ filename: 'اسم الملف', ocr: 'قراءة الصفحة', manual: 'يدوي' }[x.how] || '—') + '</td><td class="num" style="font-size:12px">' + esc(sigDate(x.at)) + '<div class="muted">' + esc(x.by) + '</div></td><td class="w"><div class="actions"><button class="btn sec sm" data-so="' + esc(x.id) + '">عرض</button><button class="btn sec sm" data-sa="' + esc(x.id) + '">نقل</button><button class="btn danger sm" data-sd="' + esc(x.id) + '">حذف</button></div></td></tr>';
+      return '<tr><td>' + (x.empId ? '<a href="#/emp/' + encodeURIComponent(x.empId) + '"><b>' + esc(x.empName) + '</b></a><div class="num muted" style="font-size:11px">' + esc(x.empId) + '</div>' : '<span class="pill r0">غير موزّع</span>') + '</td><td>' + (x.kind === 'jd' ? '<span class="pill r1">وصف وظيفي ومؤشرات</span>' : x.evalId ? (TYPE[x.type] ? TYPE[x.type][1] : '') + ' <span class="num">' + esc(x.period) + '</span>' : '<span class="muted">—</span>') + '</td><td style="font-size:12px">' + esc(x.file) + '<div class="muted num">' + Math.round(x.size / 1024) + ' KB</div></td><td>' + ({ filename: 'اسم الملف', ocr: 'قراءة الصفحة', manual: 'يدوي' }[x.how] || '—') + '</td><td class="num" style="font-size:12px">' + esc(sigDate(x.at)) + '<div class="muted">' + esc(x.by) + '</div></td><td class="w"><div class="actions"><button class="btn sec sm" data-so="' + esc(x.id) + '">عرض</button><button class="btn sec sm" data-sa="' + esc(x.id) + '">نقل</button><button class="btn danger sm" data-sd="' + esc(x.id) + '">حذف</button></div></td></tr>';
     }).join('') + '</tbody></table></div>' : '<div class="empty">لا توجد ملفات</div>';
   };
   var load = function () { return api('signedList').then(function (r) { list = r.items; drawL(); }).catch(function (e) { $('#sgl').innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; }); };
@@ -2276,7 +2283,7 @@ VIEWS.signed = function (v) {
     var o = e.target.closest('[data-so]'), a = e.target.closest('[data-sa]'), d = e.target.closest('[data-sd]');
     if (o) openSigned(o.dataset.so);
     if (a) { modal('<div class="mbox narrow"><div class="card"><div class="hd"><h2>نقل الملف إلى موظف آخر</h2></div><div class="bd stack"><select class="inp" id="sae">' + empOpts('') + '</select><div class="actions"><button class="btn pri" id="sas">نقل</button><button class="btn sec" data-close>إلغاء</button></div></div></div></div>');
-      $('#sas').onclick = function () { var id = $('#sae').value; if (!id) return; var ev = latestEval(id); api('signedAssign', { id: a.dataset.sa, empId: id, evalId: ev ? ev.id : '' }).then(function () { closeModal(); toast('نُقل'); load(); }).catch(function (er) { toast(er.message); }); }; }
+      $('#sas').onclick = function () { var id = $('#sae').value; if (!id) return; var it0 = list.filter(function (y) { return y.id === a.dataset.sa; })[0] || {}, ev = it0.kind === 'jd' ? null : latestEval(id); api('signedAssign', { id: a.dataset.sa, empId: id, evalId: ev ? ev.id : '' }).then(function () { closeModal(); toast('نُقل'); load(); }).catch(function (er) { toast(er.message); }); }; }
     if (d) reasonModal('حذف الملف', 'يُحذف الملف من المكتبة ومن ملف الموظف.', 'السبب (إلزامي)', 'حذف', true).then(function (t) { if (t) api('signedDelete', { id: d.dataset.sd, reason: t }).then(function () { toast('حُذف'); load(); }).catch(function (er) { toast(er.message); }); });
   };
   load();
@@ -2290,7 +2297,7 @@ function openSigned(id) {
 function signedForEmp(id, box) {
   if (!isAdmin() || !box) return;
   api('signedList').then(function (r) { var l = r.items.filter(function (x) { return x.empId === id; });
-    box.innerHTML = l.length ? l.map(function (x) { return '<div class="qrow"><div><b>' + (x.evalId ? (TYPE[x.type] ? TYPE[x.type][1] : '') + ' ' + esc(x.period) : esc(x.file)) + '</b> <span class="muted num">' + esc(sigDate(x.at)) + '</span></div><button class="btn sec sm" data-so="' + esc(x.id) + '">عرض</button></div>'; }).join('') : '<div class="muted">لا توجد استمارات موقّعة مرفوعة لهذا الموظف بعد.</div>';
+    box.innerHTML = l.length ? l.map(function (x) { return '<div class="qrow"><div><b>' + (x.kind === 'jd' ? 'الوصف الوظيفي ومؤشرات الأداء (موقّع)' : x.evalId ? (TYPE[x.type] ? TYPE[x.type][1] : '') + ' ' + esc(x.period) : esc(x.file)) + '</b> <span class="muted num">' + esc(sigDate(x.at)) + '</span></div><button class="btn sec sm" data-so="' + esc(x.id) + '">عرض</button></div>'; }).join('') : '<div class="muted">لا توجد استمارات موقّعة مرفوعة لهذا الموظف بعد.</div>';
     box.onclick = function (e) { var b = e.target.closest('[data-so]'); if (b) openSigned(b.dataset.so); };
   }).catch(function () {});
 }
