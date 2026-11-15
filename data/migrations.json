@@ -588,5 +588,20 @@
     }
    }
   ]
+ },
+ {
+  "id": "2026-11-15-sales-head-ops",
+  "by": "Aws Firas Al-Shalal",
+  "note": "Sales: head of department is the Operations Manager (final reference of all sales teams) — encrypted (ORG_DATA_KEY)",
+  "ops": [
+   {
+    "op": "enc",
+    "enc": {
+     "iv": "F+VZN6ZS+vSS6KYO",
+     "tag": "5CoBpBrGVnDp5qY4HDn8KQ==",
+     "data": "lzCljYY2HQCkmNa2q/mKoZJFh1Ee8Tb/EwJvySfe1Zi8forCaiXJMtloEUTkBtbWIAboF3sm7ew/WSsGS1XpwTwKWqwqeXRDzZYclhlgAVBpXK8YYhScDhXhTE2E7wk+hbNwJngPQl1RFGJmUhkISXVUt/QdVYOgr4HHAdPvj3AeJdQCDlAfoCN6pDW9+axgKYSch5pH+zXcBJXOTuTXhQVruk1oFc3lHe9jT5dTB2BNuxAzEjYWx8SUxbko2VJvihli3RC/BV+qxbuXgt4uV/vcucrTi4q93jb3GpZJIaTY"
+    }
+   }
+  ]
  }
 ]
