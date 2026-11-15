@@ -1230,11 +1230,15 @@ function jdEditor(code) {
 /* ----- employee editor + profile card */
 var PF = [['phone', 'الهاتف', 'Phone', 'tel'], ['email', 'البريد الإلكتروني', 'E-mail', 'email'], ['hire', 'تاريخ التعيين', 'Hire date', 'date'], ['birth', 'تاريخ الميلاد', 'Date of birth', 'date'],
   ['grade', 'الدرجة الوظيفية', 'Grade', 'text'], ['contract', 'نوع العقد', 'Contract', 'text'], ['nat', 'الجنسية', 'Nationality', 'text'], ['address', 'العنوان', 'Address', 'text']];
-function nextEmpIdLocal() {
-  var nums = S.data.emps.map(function (x) { return x[0]; }).filter(function (x) { return /^\d+$/.test(x); });
-  if (!nums.length) return '10001';
-  var max = nums.reduce(function (a, b) { return (b.length > a.length || (b.length === a.length && b > a)) ? b : a; });
-  var n = String(Number(max) + 1); while (n.length < max.length) n = '0' + n; return n;
+function nextEmpIdLocal(en, ar) {
+  /* LAC-<site>-<nnn>, like LAC-BG-060: the site code is taken from colleagues at the same work site (the server decides on save) */
+  var key = String(en || '').trim().toLowerCase(), kar = String(ar || '').trim(), tally = {};
+  S.data.emps.forEach(function (x) { var m = /^LAC-([A-Z]{2,3})-\d+$/.exec(x[0]); if (m && ((key && String(x[3] || '').trim().toLowerCase() === key) || (kar && String(x[4] || '').trim() === kar))) tally[m[1]] = (tally[m[1]] || 0) + 1; });
+  var code = Object.keys(tally).sort(function (a, b) { return tally[b] - tally[a]; })[0];
+  if (!code) { var t = key + ' ' + kar; code = /baghdad|بغداد/i.test(t) ? 'BG' : /erbil|اربيل|أربيل/i.test(t) ? 'ER' : /mosul|موصل/i.test(t) ? 'MO' : /basra|بصرة/i.test(t) ? 'BS' : 'HQ'; }
+  var max = 0, w = 3, re = new RegExp('^LAC-' + code + '-(\\d+)$');
+  S.data.emps.forEach(function (x) { var m = re.exec(x[0]); if (m) { max = Math.max(max, +m[1]); w = Math.max(w, m[1].length); } });
+  var n = max + 1, id; do { id = 'LAC-' + code + '-' + String(n).padStart(w, '0'); n++; } while (EMP[id]); return id;
 }
 function empEditor(id) {
   var isNew = !id, e = isNew ? ['', '', '', '', '', '', ''] : EMP[id].slice(), p = profileOf(id), orgs = S.data.orgs || { companies: [], brands: [] };
@@ -1247,7 +1251,7 @@ function empEditor(id) {
   var sites = {}; S.data.emps.forEach(function (x) { var k = (x[3] || '') + '|' + (x[4] || ''); if (x[3] || x[4]) sites[k] = (sites[k] || 0) + 1; });
   var siteOpts = '<option value="">— اختر —</option>' + Object.keys(sites).sort(function (a, b) { return sites[b] - sites[a]; }).map(function (k) { var pr = k.split('|'); return '<option value="' + esc(k) + '"' + (pr[0] === e[3] && pr[1] === e[4] ? ' selected' : '') + '>' + esc(pr[1] || pr[0]) + (pr[1] && pr[0] ? ' · ' + esc(pr[0]) : '') + '</option>'; }).join('');
   var m = modal('<div class="mbox"><div class="card"><div class="hd"><h2>' + (isNew ? 'إضافة موظف جديد' : 'تعديل بيانات الموظف') + '</h2></div><div class="bd stack">' +
-    '<div class="grid"><label class="f">الرقم الوظيفي <span class="en">Employee ID' + (isNew ? ' — يُعطى تلقائياً' : '') + '</span><input class="inp num" id="e_id" dir="ltr" value="' + esc(isNew ? nextEmpIdLocal() : e[0]) + '"' + (isNew ? ' title="يعطيه النظام عند الحفظ — يمكنك تغييره"' : ' readonly') + '></label><label class="f">الاسم الكامل <span class="en">Full name</span><input class="inp" id="e_nm" value="' + esc(e[1]) + '"></label></div>' +
+    '<div class="grid"><label class="f">الرقم الوظيفي <span class="en">Employee ID' + (isNew ? ' — يُعطى تلقائياً' : '') + '</span><input class="inp num" id="e_id" dir="ltr" value="' + esc(isNew ? '' : e[0]) + '" placeholder="' + (isNew ? 'LAC-BG-000' : '') + '"' + (isNew ? ' title="يعطيه النظام عند الحفظ — يمكنك تغييره"' : ' readonly') + '></label><label class="f">الاسم الكامل <span class="en">Full name</span><input class="inp" id="e_nm" value="' + esc(e[1]) + '"></label></div>' +
     '<div class="grid"><label class="f">القسم <span class="en">Department</span><select class="inp" id="e_dept">' + deptOpts + '</select></label>' +
     '<label class="f">المنصب / الوظيفة <span class="en">Position — تغييره يُسجَّل كتنقّل في بطاقة الموظف</span><select class="inp" id="e_job"><option value="">— اختر —</option>' + jobOpts + '</select></label></div>' +
     '<div class="muted" id="e_jd" style="font-size:12.5px;margin-top:-6px"></div>' +
@@ -1292,7 +1296,9 @@ function empEditor(id) {
   var applyMgr = function () { var x = EMP[$('#e_mgr').value]; if (!x) return; var o = orgOf(x), j = JOB[x[2]] || {};
     $('#e_rpe').value = x[1] + ((o.title || j.en) ? ' — ' + (o.title || j.en) : ''); $('#e_rpa').value = x[1] + (j.ar ? ' — ' + j.ar : ''); };
   $('#e_mgr').onchange = applyMgr;
-  $('#e_site').onchange = function () { var pr = this.value.split('|'); if (this.value) { $('#e_bre').value = pr[0] || ''; $('#e_bra').value = pr[1] || ''; } fillMgr(''); };
+  $('#e_site').onchange = function () { var pr = this.value.split('|'); if (this.value) { $('#e_bre').value = pr[0] || ''; $('#e_bra').value = pr[1] || ''; } if (isNew && !idTouched) $('#e_id').value = nextEmpIdLocal(pr[0], pr[1]); fillMgr(''); };
+  var idTouched = false; $('#e_id').addEventListener('input', function () { idTouched = true; });
+  if (isNew) $('#e_id').value = nextEmpIdLocal($('#e_bre').value, $('#e_bra').value);
   $('#e_dept').onchange = function () { filterJobs(); jdNote(); fillMgr(''); };
   jobSel.onchange = function () { if (!$('#e_dept').value && JOB[jobSel.value]) { $('#e_dept').value = String(JOB[jobSel.value].dept); filterJobs(); } jdNote(); fillMgr(); };
   if ($('#e_dept').value) filterJobs(); jobSel.value = e[2] || ''; jdNote(); fillMgr(p.mgrId);

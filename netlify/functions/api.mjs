@@ -342,14 +342,21 @@ async function renameStored(id, from, to) {
   if (tc) await setJSON('trash', tr);
   return out;
 }
-function nextEmpId() {
-  /* the next employee number: one above the highest numeric ID, same width */
-  const nums = SEED.emps.map((x) => x[0]).filter((x) => /^\d+$/.test(x));
-  if (!nums.length) return '10001';
-  const max = nums.reduce((a, b) => (BigInt(b) > BigInt(a) ? b : a));
-  let n = (BigInt(max) + 1n).toString(); while (n.length < max.length) n = '0' + n;
-  while (SEED.emps.some((x) => x[0] === n)) n = (BigInt(n) + 1n).toString();
-  return n;
+/* employee numbers follow the company pattern LAC-<site>-<nnn> (LAC-BG-060): the site code comes from colleagues at the same work site */
+const SITE_CODES = [[/baghdad|\u0628\u063a\u062f\u0627\u062f/i, 'BG'], [/erbil|\u0627\u0631\u0628\u064a\u0644|\u0623\u0631\u0628\u064a\u0644/i, 'ER'], [/mosul|\u0645\u0648\u0635\u0644/i, 'MO'], [/basra|\u0628\u0635\u0631\u0629|\u0627\u0644\u0628\u0635\u0631\u0629/i, 'BS'], [/hq|iraq|\u0627\u0644\u0639\u0631\u0627\u0642|head ?office|\u0627\u0644\u0625\u062f\u0627\u0631\u0629/i, 'HQ']];
+function siteCode(en, ar) {
+  const key = String(en || '').trim().toLowerCase(), kar = String(ar || '').trim();
+  const tally = {};
+  for (const x of SEED.emps) { const m = /^LAC-([A-Z]{2,3})-\d+$/.exec(x[0]); if (!m) continue; if ((key && String(x[3] || '').trim().toLowerCase() === key) || (kar && String(x[4] || '').trim() === kar)) tally[m[1]] = (tally[m[1]] || 0) + 1; }
+  const best = Object.entries(tally).sort((a, b) => b[1] - a[1])[0]; if (best) return best[0];
+  const t = key + ' ' + kar; for (const [re, c] of SITE_CODES) if (re.test(t)) return c;
+  return 'HQ';
+}
+function nextEmpId(en, ar) {
+  const code = siteCode(en, ar), re = new RegExp('^LAC-' + code + '-(\\d+)$');
+  let max = 0, width = 3; for (const x of SEED.emps) { const m = re.exec(x[0]); if (m) { max = Math.max(max, Number(m[1])); width = Math.max(width, m[1].length); } }
+  let n = max + 1, id; do { id = 'LAC-' + code + '-' + String(n).padStart(width, '0'); n++; } while (SEED.emps.some((x) => x[0] === id));
+  return id;
 }
 async function evals() { await migrateV3(); return getJSON('evals', {}); }
 /* incoming box for managers / GM / CEO: evaluations and self-assessments that reach them */
@@ -747,7 +754,7 @@ const R = {
   async saveEmp({ token, emp, isNew }) {
     await loadData(); const s = (v, n = 120) => String(v == null ? '' : v).trim().slice(0, n); emp = emp || {};
     const e = [s(emp.id, 30), s(emp.name), s(emp.code, 20), s(emp.br_en), s(emp.br_ar), s(emp.rep), s(emp.rep_ar)];
-    if (isNew && !e[0]) e[0] = nextEmpId();
+    if (isNew && !e[0]) e[0] = nextEmpId(e[3], e[4]);
     if (!e[0] || !e[1]) err('invalid', 'اكتب الاسم');
     const wantDept = emp.dept != null && emp.dept !== '' ? Number(emp.dept) : null;
     if (wantDept !== null && !SEED.depts.some((d) => d.no === wantDept)) err('invalid', 'القسم غير موجود');
