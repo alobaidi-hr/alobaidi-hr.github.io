@@ -64,7 +64,7 @@ var ICON = {
   law: 'M12 3v18M5 7h14M7 7l-3 7a3 3 0 0 0 6 0zM17 7l-3 7a3 3 0 0 0 6 0z',
   set: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z',
   menu: 'M3 6h18M3 12h18M3 18h18', print: 'M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v7H6z',
-  dl: 'M12 3v12M7 10l5 5 5-5M5 21h14', selfi: 'M9 11a4 4 0 1 0 0-8a4 4 0 0 0 0 8M2 21v-1a7 7 0 0 1 11-5.7M15 19l2 2 4-4', link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1', up: 'M12 19V5M5 12l7-7 7 7', swap: 'M4 7h14l-4-4M20 17H6l4 4', refresh: 'M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7', check: 'M5 12l5 5L20 7', pct: 'M19 5L5 19M7.5 5a2.5 2.5 0 1 1 0 5a2.5 2.5 0 1 1 0-5M16.5 14a2.5 2.5 0 1 1 0 5a2.5 2.5 0 1 1 0-5', archive: 'M3 4h18v4H3zM5 8v12h14V8M10 12h4', trash: 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3', plus: 'M12 5v14M5 12h14', x: 'M6 6l12 12M18 6L6 18', back: 'M9 6l6 6-6 6'
+  dl: 'M12 3v12M7 10l5 5 5-5M5 21h14', book: 'M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 19a2 2 0 0 1 2-2h13M9 7h6', play: 'M12 21a9 9 0 1 0 0-18a9 9 0 0 0 0 18M10 8.5v7l6-3.5z', pdf: 'M6 3h9l5 5v13H6zM14 3v6h6M9 12h8M9 15h8M9 18h5', selfi: 'M9 11a4 4 0 1 0 0-8a4 4 0 0 0 0 8M2 21v-1a7 7 0 0 1 11-5.7M15 19l2 2 4-4', link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1', up: 'M12 19V5M5 12l7-7 7 7', swap: 'M4 7h14l-4-4M20 17H6l4 4', refresh: 'M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7', check: 'M5 12l5 5L20 7', pct: 'M19 5L5 19M7.5 5a2.5 2.5 0 1 1 0 5a2.5 2.5 0 1 1 0-5M16.5 14a2.5 2.5 0 1 1 0 5a2.5 2.5 0 1 1 0-5', archive: 'M3 4h18v4H3zM5 8v12h14V8M10 12h4', trash: 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3', plus: 'M12 5v14M5 12h14', x: 'M6 6l12 12M18 6L6 18', back: 'M9 6l6 6-6 6'
 };
 function ic(n) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + ICON[n] + '"/></svg>'; }
 
@@ -218,7 +218,7 @@ function renderSetPassword(st, name) {
 
 /* ---------------------------------------------------------------- shell */
 var NAV = [
-  ['', [['home', 'home', 'الرئيسية'], ['erp', 'erp', 'نظام ERP', 'erp/']]],
+  ['', [['home', 'home', 'الرئيسية'], ['library', 'book', 'المكتبة التعليمية'], ['erp', 'erp', 'نظام ERP', 'erp/']]],
   ['المرجع الوظيفي', [['jd', 'jd', 'الأوصاف الوظيفية'], ['kpi', 'kpi', 'مكتبة المؤشرات'], ['emp', 'emp', 'الموظفون'], ['org', 'emp', 'الهيكل التنظيمي'], ['gov', 'gov', 'مصفوفة الصلاحيات']]],
   ['تقييم الأداء', [['box', 'inbox', 'الوارد'], ['eval', 'eval', 'تقييم موظف'], ['self', 'selfi', 'التقييم الذاتي'], ['mine', 'mine', 'تقييماتي'], ['approvals', 'check', 'الاعتمادات'], ['records', 'archive', 'الموافقات الرسمية المعتمدة']]],
   ['الإدارة', [['inbox', 'inbox', 'صندوق النتائج'], ['signed', 'up', 'مكتبة الاستمارات الموقّعة'], ['archive', 'archive', 'الأرشيف الشامل'], ['trash', 'trash', 'سلة المحذوفات'], ['users', 'users', 'المستخدمون والأقسام'], ['activity', 'act', 'سجل الدخول والزيارات'], ['law', 'law', 'الامتثال القانوني'], ['settings', 'set', 'الإعدادات']], true]
@@ -227,7 +227,7 @@ function renderShell() {
   var u = S.user, b = S.brand || {};
   var AUD = role() === 'auditor';
   var nav = NAV.filter(function (g) { return !g[2] || isAdmin(); }).map(function (g) {
-    var items = g[1].filter(function (n) { return !(role() === 'ops' && /^(eval|self|mine)$/.test(n[0])) && !(n[0] === 'box' && isAdmin()) && !(n[0] === 'records' && !canRecords()) && !(AUD && !/^(home|records|jd|kpi|gov)$/.test(n[0])); });
+    var items = g[1].filter(function (n) { return !(role() === 'ops' && /^(eval|self|mine)$/.test(n[0])) && !(n[0] === 'box' && isAdmin()) && !(n[0] === 'records' && !canRecords()) && !(AUD && !/^(home|records|jd|kpi|gov|library)$/.test(n[0])); });
     if (!items.length) return '';
     return (g[0] ? '<div class="grp">' + g[0] + '</div>' : '') + items.map(function (n) {
       return '<a class="nav" href="' + (n[3] || '#/' + n[0]) + '" data-r="' + n[0] + '">' + ic(n[1]) + '<span>' + n[2] + '</span>' + (n[0] === 'inbox' ? '<span class="badge" id="unread"' + (S.unread ? '' : ' hidden') + '>' + S.unread + '</span>' : '') + (n[0] === 'box' ? '<span class="badge" id="boxc"' + (S.boxUnread ? '' : ' hidden') + '>' + (S.boxUnread || 0) + '</span>' : '') + (n[0] === 'mine' ? '<span class="badge" id="minec">' + S.evals.length + '</span>' : '') + '</a>';
@@ -284,7 +284,7 @@ function route() {
   var r = parts[0] || 'home', arg = parts[1] ? decodeURIComponent(parts[1]) : '';
   var adminOnly = ['inbox', 'signed', 'archive', 'trash', 'users', 'activity', 'law', 'settings'];
   if (adminOnly.indexOf(r) >= 0 && !isAdmin()) r = 'home';
-  if (role() === 'auditor' && !/^(home|records|jd|kpi|gov)$/.test(r)) r = 'records';
+  if (role() === 'auditor' && !/^(home|records|jd|kpi|gov|library)$/.test(r)) r = 'records';
   if (r === 'home' && role() === 'auditor') r = 'records';
   $$('.nav').forEach(function (a) { a.classList.toggle('on', a.dataset.r === r); });
   document.body.classList.remove('navopen'); closeModal();
@@ -2176,6 +2176,9 @@ function fxCard() {
   '.odept>.oh b{font-size:14px}.odept>.oh .n{font:700 12px var(--f-num,monospace);background:rgba(255,255,255,.15);border-radius:999px;padding:2px 9px}' +
   '.ounit{padding:8px 12px;border-top:1px solid var(--line)}.ounit>.ut{font-size:12px;font-weight:700;color:var(--accent);margin-bottom:6px;display:flex;justify-content:space-between}' +
   '.ounit .ppl{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px}.ounit .oc{padding:6px 8px}.ounit .oc .av{width:24px;height:24px;font-size:10px}' +
+  '.libgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}.libc{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;cursor:pointer;transition:transform .15s,box-shadow .15s;text-align:start;padding:0;font:inherit;color:inherit}.libc:hover,.libc:focus-visible{transform:translateY(-2px);box-shadow:0 10px 26px rgba(0,0,0,.10)}' +
+  '.libc .lt{height:118px;display:grid;place-items:center;color:#fff;background:linear-gradient(135deg,var(--brand,#231D2B),#3a3045)}.libc .lt.v{background:linear-gradient(135deg,var(--accent,#E15532),#9c3a22)}.libc .lt svg{width:46px;height:46px}.libc .lt.th{background-size:cover;background-position:center;height:auto;aspect-ratio:16/9;place-items:end end;padding:10px}.libc .lt.th .li{background:rgba(20,16,24,.72);border-radius:999px;width:40px;height:40px;display:grid;place-items:center}.libc .lt.th svg{width:22px;height:22px}.libc .lb{padding:12px 14px;display:flex;flex-direction:column;gap:5px;flex:1}.libc .lb b{font-size:14.5px;line-height:1.4}.libc .lb .d{font-size:12.5px;color:var(--muted);line-height:1.55}.libc .lf{display:flex;gap:8px;align-items:center;font-size:11.5px;color:var(--muted);margin-top:auto;padding-top:6px}' +
+  '.libsec{margin:18px 0 10px;font-size:15px;font-weight:700;display:flex;gap:8px;align-items:center}.libsec .n{font:700 11.5px var(--f-num,monospace);background:var(--surface2);border:1px solid var(--line);border-radius:999px;padding:1px 9px}.libbar{height:6px;border-radius:99px;background:var(--surface2);overflow:hidden}.libbar>i{display:block;height:100%;background:var(--accent);width:0;transition:width .2s}' +
   '.drop{border:2px dashed var(--line);border-radius:14px;padding:26px;text-align:center;cursor:pointer;background:var(--surface2)}.drop.on{border-color:var(--accent);background:var(--surface)}' +
   '.qrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:12.5px}' +
   '.formcode{display:flex;justify-content:space-between;align-items:center;gap:12px;border:2px solid #231D2B;border-radius:8px;padding:4px 12px;margin-top:6px}' +
@@ -2292,6 +2295,122 @@ function ocrFile(f) {
     return f;
   }).then(function (src) { return window.Tesseract.recognize(src, 'eng'); }).then(function (r) { return r.data.text || ''; });
 }
+/* ---------------------------------------------------------------- educational library */
+var LIBCACHE = {};
+function libSize(b) { return b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.round(b / 1024) + ' KB'; }
+function libFetch(it, onp) {
+  if (LIBCACHE[it.id]) return Promise.resolve(LIBCACHE[it.id]);
+  var parts = [], n = 0;
+  var next = function () {
+    return api('libGet', { id: it.id, n: n }).then(function (r) {
+      var bin = atob(r.data), a = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i);
+      parts.push(a); n++; if (onp) onp(n / it.chunks);
+      if (n < it.chunks) return next();
+      return (LIBCACHE[it.id] = URL.createObjectURL(new Blob(parts, { type: it.mime })));
+    });
+  };
+  return next();
+}
+function libOpen(it) {
+  modal('<div class="mbox"><div class="mtool"><b>' + esc(it.title) + '</b><span class="grow"></span><span id="lbt"></span><button class="btn sec sm" data-close>إغلاق ✕</button></div><div id="lbv" style="padding:30px 10px;text-align:center"><div class="muted" style="margin-bottom:10px">يحمّل الملف… <span class="num" id="lbp">0%</span></div><div class="libbar" style="max-width:360px;margin:auto"><i id="lbb"></i></div></div></div>');
+  libFetch(it, function (f) { var p = $('#lbp'), b = $('#lbb'); if (p) p.textContent = Math.round(f * 100) + '%'; if (b) b.style.width = Math.round(f * 100) + '%'; }).then(function (url) {
+    var v = $('#lbv'); if (!v) return; v.style.padding = '0';
+    var name = it.file || (it.title + (it.mime === 'application/pdf' ? '.pdf' : '.mp4'));
+    $('#lbt').innerHTML = '<a class="btn sec sm" href="' + url + '" target="_blank" rel="noopener">فتح في نافذة جديدة</a> <a class="btn sec sm" download="' + esc(name) + '" href="' + url + '">' + ic('dl') + 'تنزيل</a>';
+    v.innerHTML = /^video\//.test(it.mime) ? '<video src="' + url + '" controls autoplay playsinline style="width:100%;max-height:78vh;border-radius:8px;background:#000"></video>'
+      : /^image\//.test(it.mime) ? '<img src="' + url + '" alt="" style="max-width:100%;border-radius:8px">'
+      : '<div id="lbpg" style="height:78vh;overflow:auto;background:var(--surface2);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:10px;align-items:center"><div class="muted" id="lbpm">يجهّز الصفحات…</div></div>';
+    if (it.mime === 'application/pdf') libPdf(url);
+  }).catch(function (e) { var v = $('#lbv'); if (v) v.innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; });
+}
+function libPdf(url) {
+  /* pages are drawn by pdf.js so the guide reads the same on phones, where the browser shows no PDF inside a page */
+  loadScript(OCR.pdf).then(function () {
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = OCR.worker;
+    return window.pdfjsLib.getDocument(url).promise;
+  }).then(function (pdf) {
+    var box = $('#lbpg'); if (!box) return; box.innerHTML = '';
+    var w = Math.min(box.clientWidth - 20, 1400), dpr = Math.min(window.devicePixelRatio || 1, 2), slots = [];
+    for (var i = 1; i <= pdf.numPages; i++) { var c = document.createElement('canvas'); c.dataset.p = i; c.style.cssText = 'width:' + w + 'px;max-width:100%;background:#fff;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.12);aspect-ratio:16/9'; box.appendChild(c); slots.push(c); }
+    var draw = function (c) {
+      if (c.dataset.done) return; c.dataset.done = 1;
+      pdf.getPage(+c.dataset.p).then(function (pg) { var v0 = pg.getViewport({ scale: 1 }), vp = pg.getViewport({ scale: c.clientWidth * dpr / v0.width }); c.width = vp.width; c.height = vp.height; c.style.aspectRatio = v0.width + '/' + v0.height; return pg.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise; });
+    };
+    if ('IntersectionObserver' in window) { var io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting) { draw(e.target); io.unobserve(e.target); } }); }, { root: box, rootMargin: '600px' }); slots.forEach(function (c) { io.observe(c); }); }
+    else slots.forEach(draw);
+  }).catch(function () { var box = $('#lbpg'); if (box) box.innerHTML = '<iframe src="' + url + '" style="width:100%;height:100%;border:0;background:#fff"></iframe>'; });
+}
+function libThumb(f) {
+  /* a small picture of the first page or frame, drawn in the browser, for the library card */
+  var shot = function (src, w, h) { var c = document.createElement('canvas'), W = 560; c.width = W; c.height = Math.round(W * h / w); c.getContext('2d').drawImage(src, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', .72); };
+  var url = URL.createObjectURL(f), done = function (x) { URL.revokeObjectURL(url); return x; };
+  var p = f.type === 'application/pdf' ? loadScript(OCR.pdf).then(function () { window.pdfjsLib.GlobalWorkerOptions.workerSrc = OCR.worker; return window.pdfjsLib.getDocument(url).promise; }).then(function (pdf) { return pdf.getPage(1); }).then(function (pg) {
+      var v0 = pg.getViewport({ scale: 1 }), vp = pg.getViewport({ scale: 560 / v0.width }), c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height; return pg.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise.then(function () { return shot(c, c.width, c.height); }); })
+    : /^video\//.test(f.type) ? new Promise(function (res, rej) { var v = document.createElement('video'); v.muted = true; v.preload = 'auto'; v.playsInline = true; v.onloadeddata = function () { v.currentTime = Math.min(2, (v.duration || 4) / 3); }; v.onseeked = function () { res(shot(v, v.videoWidth, v.videoHeight)); }; v.onerror = rej; v.src = url; setTimeout(function () { rej('timeout'); }, 15000); })
+    : /^image\//.test(f.type) ? new Promise(function (res, rej) { var i = new Image(); i.onload = function () { res(shot(i, i.width, i.height)); }; i.onerror = rej; i.src = url; }) : Promise.resolve('');
+  return p.then(done, function () { return done(''); });
+}
+function libUploadModal(done) {
+  var cats = VIEWS.library.cats || [];
+  modal('<div class="mbox narrow"><div class="card"><div class="hd"><h2>إضافة مادة إلى المكتبة</h2></div><div class="bd stack">' +
+    '<label class="f">الملف (PDF أو فيديو MP4 أو صورة · حتى 80MB)<input class="inp" id="luf" type="file" accept="application/pdf,video/mp4,video/webm,image/jpeg,image/png"></label>' +
+    '<label class="f">العنوان<input class="inp" id="lut" maxlength="160"></label>' +
+    '<label class="f">وصف قصير<textarea class="inp" id="lud" rows="2" maxlength="600"></textarea></label>' +
+    '<label class="f">التصنيف<select class="inp" id="luc">' + cats.map(function (c) { return '<option value="' + c[0] + '">' + esc(c[1]) + '</option>'; }).join('') + '</select></label>' +
+    '<div class="libbar" id="lubw" hidden><i id="lub"></i></div><div class="actions"><button class="btn pri" id="lus">' + ic('up') + 'رفع</button><button class="btn sec" data-close>إلغاء</button></div><div class="msg" id="lum"></div></div></div></div>');
+  $('#luf').onchange = function () { var f = this.files[0]; if (!f) return; if (!$('#lut').value) $('#lut').value = f.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' '); $('#luc').value = /^video\//.test(f.type) ? 'video' : 'guide'; };
+  $('#lus').onclick = function () {
+    var f = $('#luf').files[0], m = $('#lum'), btn = this; m.className = 'msg';
+    if (!f) { m.className = 'msg err'; m.textContent = 'اختر ملفاً'; return; }
+    var CH = 3 * 1024 * 1024, chunks = Math.max(1, Math.ceil(f.size / CH)), item;
+    btn.disabled = true; $('#lubw').hidden = false;
+    var send = function (n) {
+      if (n >= chunks) return api('libCommit', { id: item.id });
+      return fileData(f.slice(n * CH, Math.min(f.size, (n + 1) * CH))).then(function (d) { return api('libChunk', { id: item.id, n: n, data: String(d).slice(String(d).indexOf(',') + 1) }); })
+        .then(function () { $('#lub').style.width = Math.round((n + 1) / chunks * 100) + '%'; m.textContent = 'رُفع ' + (n + 1) + ' من ' + chunks; return send(n + 1); });
+    };
+    m.textContent = 'يجهّز صورة المعاينة…';
+    libThumb(f).then(function (th) { return api('libBegin', { meta: { title: $('#lut').value, desc: $('#lud').value, cat: $('#luc').value, name: f.name, mime: f.type, size: f.size, chunks: chunks, thumb: th } }); })
+      .then(function (r) { item = r.item; return send(0); })
+      .then(function () { closeModal(); toast('أُضيفت المادة إلى المكتبة'); done(); })
+      .catch(function (e) { btn.disabled = false; m.className = 'msg err'; m.textContent = e.message; });
+  };
+}
+VIEWS.library = function (v) {
+  var list = [], q = '';
+  v.innerHTML = head('المكتبة التعليمية', 'أدلة الاستخدام والعروض والفيديوهات التعليمية لنظام الموارد البشرية — متاحة لكل المستخدمين للعرض والتنزيل', '',
+    (isAdmin() ? '<button class="btn pri" id="lba">' + ic('plus') + 'إضافة مادة</button>' : '')) +
+    '<input class="inp" id="lbq" type="search" placeholder="بحث في المكتبة" style="max-width:320px"><div id="lbl"><div class="loading" style="min-height:20vh"><div class="spin"></div></div></div>';
+  var draw = function () {
+    var cats = VIEWS.library.cats || [], l = list.filter(function (x) { return !q || (x.title + ' ' + (x.desc || '')).toLowerCase().indexOf(q) >= 0; });
+    if (!l.length) { $('#lbl').innerHTML = '<div class="empty">' + (list.length ? 'لا نتائج' : 'المكتبة فارغة بعد') + '</div>'; return; }
+    $('#lbl').innerHTML = cats.map(function (c) {
+      var g = l.filter(function (x) { return x.cat === c[0]; }); if (!g.length) return '';
+      return '<div class="libsec">' + esc(c[1]) + '<span class="n">' + g.length + '</span></div><div class="libgrid">' + g.map(function (x) {
+        var vid = /^video\//.test(x.mime);
+        return '<div class="libc" role="button" tabindex="0" data-lo="' + esc(x.id) + '"><div class="lt' + (vid ? ' v' : '') + (x.thumb ? ' th' : '') + '"' + (x.thumb ? ' style="background-image:url(' + x.thumb + ')"' : '') + '><span class="li">' + ic(vid ? 'play' : 'pdf') + '</span></div><div class="lb"><b>' + esc(x.title) + '</b>' + (x.desc ? '<div class="d">' + esc(x.desc) + '</div>' : '') +
+          '<div class="lf"><span class="pill ' + (vid ? 'r1' : 'r3') + '">' + (vid ? 'فيديو' : x.mime === 'application/pdf' ? 'PDF' : 'صورة') + '</span><span class="num">' + libSize(x.size) + '</span>' + (x.st !== 'ready' ? '<span class="pill r0">رفع غير مكتمل</span>' : '') + '<span class="grow"></span>' +
+          (isAdmin() ? '<button class="btn sec sm" data-le="' + esc(x.id) + '">تعديل</button><button class="btn danger sm" data-ld="' + esc(x.id) + '">حذف</button>' : '') + '</div></div></div>';
+      }).join('') + '</div>';
+    }).join('');
+  };
+  var load = function () { return api('libList').then(function (r) { list = r.items; VIEWS.library.cats = r.cats; draw(); }).catch(function (e) { $('#lbl').innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; }); };
+  $('#lbq').oninput = function () { q = this.value.trim().toLowerCase(); draw(); };
+  if ($('#lba')) $('#lba').onclick = function () { libUploadModal(load); };
+  var act = function (e) {
+    var d = e.target.closest('[data-ld]'), ed = e.target.closest('[data-le]'), o = e.target.closest('[data-lo]');
+    var find = function (id) { return list.filter(function (x) { return x.id === id; })[0]; };
+    if (d) { e.stopPropagation(); reasonModal('حذف المادة', 'تُحذف المادة من المكتبة لكل المستخدمين.', 'السبب (إلزامي)', 'حذف', true).then(function (t) { if (t) api('libDelete', { id: d.dataset.ld, reason: t }).then(function () { toast('حُذفت'); load(); }).catch(function (er) { toast(er.message); }); }); return; }
+    if (ed) { e.stopPropagation(); var it = find(ed.dataset.le), cats = VIEWS.library.cats || [];
+      modal('<div class="mbox narrow"><div class="card"><div class="hd"><h2>تعديل المادة</h2></div><div class="bd stack"><label class="f">العنوان<input class="inp" id="let" maxlength="160" value="' + esc(it.title) + '"></label><label class="f">وصف قصير<textarea class="inp" id="led" rows="2" maxlength="600">' + esc(it.desc || '') + '</textarea></label><label class="f">التصنيف<select class="inp" id="lec">' + cats.map(function (c) { return '<option value="' + c[0] + '"' + (c[0] === it.cat ? ' selected' : '') + '>' + esc(c[1]) + '</option>'; }).join('') + '</select></label><label class="f">الترتيب (الأصغر أولاً)<input class="inp num" id="leo" type="number" value="' + (it.order || 0) + '"></label><div class="actions"><button class="btn pri" id="les">حفظ</button><button class="btn sec" data-close>إلغاء</button></div><div class="msg" id="lem"></div></div></div></div>');
+      $('#les').onclick = function () { api('libEdit', { id: it.id, meta: { title: $('#let').value, desc: $('#led').value, cat: $('#lec').value, order: $('#leo').value } }).then(function () { closeModal(); toast('حُفظ'); load(); }).catch(function (er) { $('#lem').className = 'msg err'; $('#lem').textContent = er.message; }); };
+      return; }
+    if (o) { var x = find(o.dataset.lo); if (x && x.st === 'ready') libOpen(x); else if (x) toast('رفع هذه المادة لم يكتمل — احذفها وأعد الرفع'); }
+  };
+  $('#lbl').onclick = act;
+  $('#lbl').onkeydown = function (e) { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-lo]')) { e.preventDefault(); act(e); } };
+  load();
+};
 VIEWS.signed = function (v) {
   if (!isAdmin()) { location.hash = '#/home'; return; }
   var Q = [], list = [], q = '';

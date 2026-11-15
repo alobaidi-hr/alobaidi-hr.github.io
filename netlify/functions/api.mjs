@@ -407,6 +407,8 @@ const afterEmployee = (r) => { r.wf.stage = r.wf.head && r.wf.head.email && !r.w
 const CAP_NAMES = { owner: 'مالك النظام', hr: 'الموارد البشرية', evaluator: 'المقيّم', gm: 'المدير العام', ceo: 'الرئيس التنفيذي', auditor: 'المدقق الداخلي', employee: 'الموظف', ops: 'مدير العمليات', head: 'مدير القسم' };
 const sha = (o) => crypto.createHash('sha256').update(JSON.stringify(o)).digest('hex');
 const needGrant = (u, k) => { if (!grantsOf(u)[k]) err('forbidden', 'ليست لديك صلاحية هذا الإجراء (تُمنح من مالك النظام)'); };
+const LIB_CHUNK = 3 * 1024 * 1024, LIB_MAX = 80 * 1024 * 1024, LIB_MIME = ['application/pdf', 'video/mp4', 'video/webm', 'image/jpeg', 'image/png'];
+const LIB_CATS = [['guide', '\u0623\u062f\u0644\u0629 \u0627\u0644\u0627\u0633\u062a\u062e\u062f\u0627\u0645'], ['video', '\u0641\u064a\u062f\u064a\u0648\u0647\u0627\u062a \u062a\u0639\u0644\u064a\u0645\u064a\u0629'], ['policy', '\u0627\u0644\u0633\u064a\u0627\u0633\u0627\u062a \u0648\u0627\u0644\u0646\u0645\u0627\u0630\u062c'], ['training', '\u0627\u0644\u062a\u062f\u0631\u064a\u0628']];
 const needReason = (s, min = 5) => { s = String(s || '').trim().slice(0, 1500); if (s.length < min) err('invalid', 'السبب إلزامي'); return s; };
 
 /* exchange rate: IQD per 1 USD, set by HR; a raise stores the rate it was computed with */
@@ -1050,6 +1052,56 @@ const R = {
     const { email, u } = await admin(token); reason = needReason(reason); const idx = await getJSON('signed', {}), it = idx[id]; if (!it) err('not_found', 'الملف غير موجود');
     const all = await evals(); if (it.evalId && all[it.evalId] && all[it.evalId].paper && all[it.evalId].paper.doc === id) { delete all[it.evalId].paper; await setJSON('evals', all); }
     delete idx[id]; await setJSON('signed', idx); await store().delete('sdoc/' + id); await logVisit(email, u.name, 'signed-delete', id + ' ' + reason.slice(0, 60)); return {};
+  },
+
+  /* ---------- educational library: presentations (PDF) and videos for everyone signed in ---------- */
+  async libList({ token }) {
+    const { u } = await auth(token), idx = await getJSON('library', {});
+    const items = Object.values(idx).filter((x) => x.st === 'ready' || u.role === 'admin').sort((a, b) => (a.order || 0) - (b.order || 0) || (a.at < b.at ? 1 : -1));
+    return { items, cats: LIB_CATS };
+  },
+  async libBegin({ token, meta = {} }) {
+    const { email, u } = await admin(token), s = (v, n) => String(v == null ? '' : v).trim().slice(0, n);
+    const mime = s(meta.mime, 60), size = Number(meta.size), chunks = Number(meta.chunks);
+    if (!LIB_MIME.includes(mime)) err('invalid', 'الصيغ المقبولة: PDF أو فيديو MP4/WebM أو صورة');
+    if (!(size > 0 && size <= LIB_MAX)) err('too_large', 'أقصى حجم للملف 80 ميغابايت');
+    if (!(Number.isInteger(chunks) && chunks >= 1 && chunks === Math.ceil(size / LIB_CHUNK))) err('invalid', 'تقسيم الملف غير صحيح');
+    const title = s(meta.title, 160); if (title.length < 3) err('invalid', 'اكتب عنواناً للمادة');
+    const id = 'LB' + crypto.randomBytes(5).toString('hex').toUpperCase();
+    const item = { id, title, desc: s(meta.desc, 600), cat: LIB_CATS.some((c) => c[0] === meta.cat) ? meta.cat : 'guide', file: s(meta.name, 160), mime, size, chunks, st: 'uploading', at: now(), by: u.name, email, order: Number(meta.order) || 0 };
+    const th = String(meta.thumb || ''); if (/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(th) && th.length < 200000) item.thumb = th;
+    const idx = await getJSON('library', {}); idx[id] = item; await setJSON('library', idx); return { item, chunk: LIB_CHUNK };
+  },
+  async libChunk({ token, id, n, data }) {
+    await admin(token); const it = (await getJSON('library', {}))[id]; if (!it) err('not_found', 'المادة غير موجودة');
+    if (it.st !== 'uploading') err('invalid', 'اكتمل رفع هذه المادة'); n = Number(n);
+    if (!(Number.isInteger(n) && n >= 0 && n < it.chunks)) err('invalid', 'رقم الجزء غير صحيح');
+    const d = String(data || ''); if (!/^[A-Za-z0-9+/]*={0,2}$/.test(d) || !d.length) err('invalid', 'محتوى الجزء غير صالح');
+    const want = n < it.chunks - 1 ? LIB_CHUNK : it.size - LIB_CHUNK * (it.chunks - 1); if (Buffer.byteLength(d, 'base64') !== want) err('invalid', 'حجم الجزء لا يطابق الملف');
+    await store().set('libf/' + id + '/' + n, d); return {};
+  },
+  async libCommit({ token, id }) {
+    const { email, u } = await admin(token), idx = await getJSON('library', {}), it = idx[id]; if (!it) err('not_found', 'المادة غير موجودة');
+    const { blobs } = await store().list({ prefix: 'libf/' + id + '/' }); if (blobs.length !== it.chunks) err('incomplete', 'لم تكتمل أجزاء الملف — أعد الرفع');
+    it.st = 'ready'; it.readyAt = now(); await setJSON('library', idx); await logVisit(email, u.name, 'lib-upload', id + ' ' + it.title.slice(0, 50)); return { item: it };
+  },
+  async libGet({ token, id, n }) {
+    const { email, u } = await auth(token), it = (await getJSON('library', {}))[id]; if (!it || (it.st !== 'ready' && u.role !== 'admin')) err('not_found', 'المادة غير موجودة');
+    n = Number(n) || 0; if (!(n >= 0 && n < it.chunks)) err('invalid', 'رقم الجزء غير صحيح');
+    const d = await store().get('libf/' + id + '/' + n); if (d == null) err('not_found', 'جزء من الملف مفقود');
+    if (n === 0) await logVisit(email, u.name, 'lib-open', id); return { data: d, n, chunks: it.chunks };
+  },
+  async libEdit({ token, id, meta = {} }) {
+    const { email, u } = await admin(token), idx = await getJSON('library', {}), it = idx[id]; if (!it) err('not_found', 'المادة غير موجودة');
+    const s = (v, n) => String(v == null ? '' : v).trim().slice(0, n);
+    if (meta.title != null) { const t = s(meta.title, 160); if (t.length < 3) err('invalid', 'اكتب عنواناً للمادة'); it.title = t; }
+    if (meta.desc != null) it.desc = s(meta.desc, 600); if (LIB_CATS.some((c) => c[0] === meta.cat)) it.cat = meta.cat; if (meta.order != null) it.order = Number(meta.order) || 0;
+    await setJSON('library', idx); await logVisit(email, u.name, 'lib-edit', id); return { item: it };
+  },
+  async libDelete({ token, id, reason }) {
+    const { email, u } = await admin(token); reason = needReason(reason); const idx = await getJSON('library', {}), it = idx[id]; if (!it) err('not_found', 'المادة غير موجودة');
+    for (let n = 0; n < it.chunks; n++) await store().delete('libf/' + id + '/' + n);
+    delete idx[id]; await setJSON('library', idx); await logVisit(email, u.name, 'lib-delete', id + ' ' + reason.slice(0, 60)); return {};
   },
 
   /* ---------- direct link for the ERP: read-only feed behind a key the owner issues ---------- */
