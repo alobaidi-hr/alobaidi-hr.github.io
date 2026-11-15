@@ -558,5 +558,20 @@
     }
    }
   ]
+ },
+ {
+  "id": "2026-11-15-jd-reports-to",
+  "by": "Aws Firas Al-Shalal",
+  "note": "Job descriptions: Reports To follows the new Sales and Marketing & CX heads — encrypted (ORG_DATA_KEY)",
+  "ops": [
+   {
+    "op": "enc",
+    "enc": {
+     "iv": "FWEgcb2xz/K+JlJK",
+     "tag": "fTWGbdOuSk3VV0bAr2nl/Q==",
+     "data": "3/kXnqgdBue/6+Z0CXJhO8/1w+QfJDTZ+cVqDj8sPKL+raeSmnzKBz+9q1QKF8tdfTsN1kx0bmNsn2yWPfD9AohBCbAHmRosSF3NO/35uaA3CGxqXOH31atCWgPExDtsPOJL8ps2KhMrxW22bJjOaW8yR+Q9/JBxoRIgOvLaSvSPfMD6gT8NmCmGXVQUkF208nD5R5w8hUFhIOwsBPO7qEXFWPTzUhVNYw4mVm2Mcj0NZ8r2nx0uIV1/7perOqx7htDzpEmpERplMgKOa8IrJKSosA4Pd9JOEM73kkO5Uwhzg7hmjn1UdcAJP1H0giju6KPvJ6sRaFuW4fnVO+sJO3M7ChZPjpFEPXeVtEhwMcutLliXqGTyEW8pRFJ/zXnT0F6/zXYFLssGCfZaVxRp/t57Pew8CQUiyQ2LAFCRCHao8vhgrnxEXmlP1bprJ0yBktFmJt0dk+dezf8r57gHejyeTZ0Mik2KREsAH+pStf3gGAXt8ItNq+NmWPA14JYoDRJCmTf7USSdFk1fDQpr8ijo5Zl1mnorANR1joEsb2dcIsT9hvrT9fj1JIyZ89nVqqXlBQplc7TnUrYcvDL/OyL6kSAmujpWjMnJaaIpHgXlP2cwxehkUVgOwq6FSWQbjk8rH9vntg7yTkxFtx8eAKzkSoYBW0crAy9e86Vp5bwzWIoIGyCHObIxKstfU5wj7h0EMj5LrQbAVlsZ85g66k4Wetg8VxgsLWfMiPlmhgfDVwQdqHowhxhUV8d/mCcBW0vbxiqrapmooG+u6pfV5mtET0b65PB+eGyQgNuGIYolUEDt4DlvFRR9oY5py72bf9TnTzmDptH7fvTudC/tEQ3OFCeIxxJQkVWWQ2egy3VjbWM/umzUSG6K7GQZFic0B/XnJw5e5k1xW55+8tzkUHjoWyE7eXnSvXYsRHuVAYU3PurpQ/k0FmfK70exvqtEZQjiN6RzLY8fh4XrYORtchW7eH+r9MyZF4nXzcMlfw21OVtrUzMSIf/6kyTas3tVaOU08GMXEN7Vx4Uiko2oxgT6Iayv"
+    }
+   }
+  ]
  }
 ]
