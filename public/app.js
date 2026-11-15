@@ -154,13 +154,13 @@ function loadAll() {
   }).catch(function (e) { if (e && e.error === 'auth') return; if (e && e.error === 'noaccess') return renderNoAccess(e); if (e && e.error === 'locked_data') return e.message === 'admin' ? renderUnlock() : renderNoAccess(e); renderLogin(e && e.message); });
 }
 function renderUnlock(msg) {
-  $('#app').innerHTML = '<div class="login"><section class="login-brand"><img class="shield" src="' + esc(shieldSrc()) + '" alt=""><img class="wordmark" src="' + LO_IMG.wordmark + '" alt=""><h1>تفعيل بيانات النظام</h1><p>خطوة لمرة واحدة فقط: بيانات الموظفين والأوصاف محفوظة مشفّرة، وتُفتح بمفتاح البيانات الخاص بمدير الموارد البشرية.</p></section><section class="login-form"><form class="lcard" id="uf" novalidate><h2>مفتاح البيانات</h2><label class="f">أدخل مفتاح البيانات <span class="en">Data key</span><input class="inp" id="uk" dir="ltr" autocomplete="off"></label><button class="btn pri block" id="ub">تفعيل</button><div class="msg err" id="um" role="alert">' + esc(msg || '') + '</div><div class="credit-line">إعداد مدير الموارد البشرية <b>أوس فراس الشلال</b></div></form></section></div>';
+  $('#app').innerHTML = '<div class="login"><section class="login-brand"><img class="shield" src="' + esc(shieldSrc()) + '" alt=""><img class="wordmark" src="' + LO_IMG.wordmark + '" alt=""><h1>تفعيل بيانات النظام</h1><p>خطوة لمرة واحدة فقط: بيانات الموظفين والأوصاف محفوظة مشفّرة، وتُفتح بمفتاح البيانات الخاص بمدير الموارد البشرية.</p></section><section class="login-form"><form class="lcard" id="uf" novalidate><h2>مفتاح البيانات</h2><label class="f">أدخل مفتاح البيانات <span class="en">Data key</span><input class="inp" id="uk" dir="ltr" autocomplete="off"></label><button class="btn pri block" id="ub">تفعيل</button><div class="msg err" id="um" role="alert">' + esc(msg || '') + '</div><div class="credit-line">بناء وتطوير السيد <b>أوس فراس الشلال</b> — مدير دائرة الموارد البشرية · العراق</div></form></section></div>';
   $('#uf').addEventListener('submit', function (ev) { ev.preventDefault(); $('#ub').disabled = true;
     api('unlockData', { passphrase: $('#uk').value.trim() }).then(function () { loadAll(); }).catch(function (er) { $('#um').textContent = er.message || 'تعذّر التفعيل'; $('#ub').disabled = false; }); });
   $('#uk').focus();
 }
 function renderNoAccess(e) {
-  $('#app').innerHTML = '<div class="login"><section class="login-brand"><img class="shield" src="' + esc(shieldSrc()) + '" alt=""><img class="wordmark" src="' + LO_IMG.wordmark + '" alt=""><h1>نظام الأوصاف الوظيفية ومؤشرات الأداء والتقييم</h1></section><section class="login-form"><div class="lcard"><h2>بانتظار الصلاحية</h2><p>' + esc(e.message) + '</p>' + (e.who ? '<div class="note">' + esc(e.who) + '</div>' : '') + '<div class="credit-line">إعداد مدير الموارد البشرية <b>أوس فراس الشلال</b></div></div></section></div>';
+  $('#app').innerHTML = '<div class="login"><section class="login-brand"><img class="shield" src="' + esc(shieldSrc()) + '" alt=""><img class="wordmark" src="' + LO_IMG.wordmark + '" alt=""><h1>نظام الأوصاف الوظيفية ومؤشرات الأداء والتقييم</h1></section><section class="login-form"><div class="lcard"><h2>بانتظار الصلاحية</h2><p>' + esc(e.message) + '</p>' + (e.who ? '<div class="note">' + esc(e.who) + '</div>' : '') + '<div class="credit-line">بناء وتطوير السيد <b>أوس فراس الشلال</b> — مدير دائرة الموارد البشرية · العراق</div></div></section></div>';
 }
 function logout(expired) {
   if (S.token && !expired) api('logout').catch(function () {});
@@ -169,21 +169,22 @@ function logout(expired) {
 }
 
 /* ---------------------------------------------------------------- login */
+var CREDIT_HTML = '<div class="login-credit"><span class="lc-k">بناء وتطوير</span><b>السيد أوس فراس الشلال</b><span>مدير دائرة الموارد البشرية — العراق</span><span class="en">Built &amp; developed by Mr. Aws Firas Al-Shalal · Head of Human Resources, Iraq</span></div>';
 function renderLogin(msg) {
   var b = S.brand || {};
   $('#app').innerHTML = '<div class="login">' +
     '<section class="login-brand"><img class="shield" src="' + esc(shieldSrc()) + '" alt="شعار الشركة">' +
     '<img class="wordmark" src="' + LO_IMG.wordmark + '" alt="' + esc(b.company_ar || 'شركة الليث العبيدي') + '">' +
-    '<div><h1>نظام الأوصاف الوظيفية ومؤشرات الأداء والتقييم</h1><p class="en" style="color:inherit;opacity:.75">HR — Job Descriptions, KPIs &amp; Performance</p></div>' +
-    '<p>المرجع المعتمد للأوصاف الوظيفية ومؤشرات الأداء الرئيسية وتقييم أداء الموظفين في الشركة.</p>' +
-    '</section>' +
+    '<div class="lb-text"><h1>نظام الأوصاف الوظيفية ومؤشرات الأداء والتقييم</h1><p class="en lb-en">HR — Job Descriptions, KPIs &amp; Performance</p>' +
+    '<p>المرجع المعتمد للأوصاف الوظيفية ومؤشرات الأداء الرئيسية وتقييم أداء الموظفين في الشركة.</p></div>' +
+    CREDIT_HTML + '</section>' +
     '<section class="login-form"><form class="lcard" id="lf" novalidate>' +
-    '<div><h2>تسجيل الدخول</h2><div class="muted">Sign in with your company e-mail</div></div>' +
-    '<label class="f">البريد الإلكتروني <span class="en">E-mail</span><input class="inp" id="le" type="email" autocomplete="username" dir="ltr" required></label>' +
-    '<label class="f">كلمة المرور أو رمز التفعيل <span class="en">Password or activation code</span><input class="inp" id="lp" type="password" autocomplete="current-password" dir="ltr" required></label>' +
+    '<div class="lc-head"><h2>تسجيل الدخول</h2><div class="muted">ادخل ببريد الشركة الإلكتروني<br><span class="en">Sign in with your company e-mail</span></div></div>' +
+    '<label class="f lf"><span class="lt">البريد الإلكتروني <span class="en">E-mail</span></span><input class="inp" id="le" type="email" autocomplete="username" dir="ltr" required></label>' +
+    '<label class="f lf"><span class="lt">كلمة المرور أو رمز التفعيل <span class="en">Password or code</span></span><input class="inp" id="lp" type="password" autocomplete="current-password" dir="ltr" required></label>' +
     '<button class="btn pri block" id="lb">دخول</button><div class="msg err" id="lm" role="alert">' + esc(msg || '') + '</div>' +
     '<div class="note">أول دخول: استخدم رمز التفعيل الذي أرسلته لك الموارد البشرية، ثم اختر كلمة مرور خاصة بك.</div>' +
-    '<div class="credit-line">إعداد مدير الموارد البشرية <b>أوس فراس الشلال</b><br><span class="en">Prepared by HR Manager Aws Firas Al-Shalal</span></div>' +
+    '<div class="credit-line m-only">بناء وتطوير السيد <b>أوس فراس الشلال</b><br>مدير دائرة الموارد البشرية — العراق</div>' +
     '</form></section></div>';
   $('#le').value = LS.get('email', '');
   $('#lf').addEventListener('submit', function (ev) {
@@ -201,8 +202,8 @@ function renderLogin(msg) {
 }
 function renderSetPassword(st, name) {
   $('.lcard').outerHTML = '<form class="lcard" id="sf" novalidate><div><h2>أهلاً ' + esc(name || '') + '</h2><div class="muted">اختر كلمة مرور خاصة بك للدخول لاحقاً (8 أحرف على الأقل).</div></div>' +
-    '<label class="f">كلمة المرور الجديدة <span class="en">New password</span><input class="inp" id="p1" type="password" autocomplete="new-password" dir="ltr"></label>' +
-    '<label class="f">تأكيد كلمة المرور <span class="en">Confirm</span><input class="inp" id="p2" type="password" autocomplete="new-password" dir="ltr"></label>' +
+    '<label class="f lf"><span class="lt">كلمة المرور الجديدة <span class="en">New password</span></span><input class="inp" id="p1" type="password" autocomplete="new-password" dir="ltr"></label>' +
+    '<label class="f lf"><span class="lt">تأكيد كلمة المرور <span class="en">Confirm</span></span><input class="inp" id="p2" type="password" autocomplete="new-password" dir="ltr"></label>' +
     '<button class="btn pri block" id="sb">حفظ والدخول</button><div class="msg err" id="sm" role="alert"></div></form>';
   $('#p1').focus();
   $('#sf').addEventListener('submit', function (ev) {
@@ -241,7 +242,7 @@ function renderShell() {
     '<div class="lbl">ألوان النظام · Colour theme</div><div class="swatches">' + SKINS.map(function (s) { return '<button class="sw" data-skin="' + s[0] + '" title="' + s[1] + '" aria-label="' + s[1] + '"><span style="background:' + s[2] + '"></span><span style="background:' + s[3] + '"></span></button>'; }).join('') + '</div>' +
     '<div class="lbl">الوضع · Mode</div><div class="actions"><button class="btn sec sm" data-mode="light">فاتح</button><button class="btn sec sm" data-mode="dark">داكن</button></div>' +
     '<button class="dd-btn" id="msig">توقيعي الإلكتروني</button><button class="dd-btn" id="cpw">تغيير كلمة المرور</button><button class="dd-btn" id="lo">تسجيل الخروج · Sign out</button></div>' +
-    '<div class="shell"><nav class="side" id="side">' + nav + '<div class="foot">إعداد مدير الموارد البشرية<br><b>أوس فراس الشلال</b><br><span class="en">Prepared by HR Manager Aws Firas Al-Shalal · v1.0</span></div></nav>' +
+    '<div class="shell"><nav class="side" id="side">' + nav + '<div class="foot">بناء وتطوير<br><b>السيد أوس فراس الشلال</b><br>مدير دائرة الموارد البشرية — العراق<br><span class="en">Built &amp; developed by Aws Firas Al-Shalal</span></div></nav>' +
     '<div class="scrim" id="scrim"></div><main class="view" id="view" tabindex="-1"></main></div><div id="modalRoot"></div>';
   $('#mt').onclick = function () { document.body.classList.toggle('navopen'); };
   $('#scrim').onclick = function () { document.body.classList.remove('navopen'); };
@@ -2179,6 +2180,11 @@ function fxCard() {
   '.libgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}.libc{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;cursor:pointer;transition:transform .15s,box-shadow .15s;text-align:start;padding:0;font:inherit;color:inherit}.libc:hover,.libc:focus-visible{transform:translateY(-2px);box-shadow:0 10px 26px rgba(0,0,0,.10)}' +
   '.libc .lt{height:118px;display:grid;place-items:center;color:#fff;background:linear-gradient(135deg,var(--brand,#231D2B),#3a3045)}.libc .lt.v{background:linear-gradient(135deg,var(--accent,#E15532),#9c3a22)}.libc .lt svg{width:46px;height:46px}.libc .lt.th{background-size:cover;background-position:center;height:auto;aspect-ratio:16/9;place-items:end end;padding:10px}.libc .lt.th .li{background:rgba(20,16,24,.72);border-radius:999px;width:40px;height:40px;display:grid;place-items:center}.libc .lt.th svg{width:22px;height:22px}.libc .lb{padding:12px 14px;display:flex;flex-direction:column;gap:5px;flex:1}.libc .lb b{font-size:14.5px;line-height:1.4}.libc .lb .d{font-size:12.5px;color:var(--muted);line-height:1.55}.libc .lf{display:flex;gap:8px;align-items:center;font-size:11.5px;color:var(--muted);margin-top:auto;padding-top:6px}' +
   '.libsec{margin:18px 0 10px;font-size:15px;font-weight:700;display:flex;gap:8px;align-items:center}.libsec .n{font:700 11.5px var(--f-num,monospace);background:var(--surface2);border:1px solid var(--line);border-radius:999px;padding:1px 9px}.libbar{height:6px;border-radius:99px;background:var(--surface2);overflow:hidden}.libbar>i{display:block;height:100%;background:var(--accent);width:0;transition:width .2s}' +
+  '.login-brand{justify-content:center;padding:56px clamp(28px,5vw,72px) 40px;gap:22px}.login-brand .lb-text{display:flex;flex-direction:column;gap:10px;max-width:520px}.login-brand .lb-en{color:inherit;opacity:.65;margin:0;font-size:12.5px;text-align:right}' +
+  '.login-credit{margin-top:auto;display:flex;flex-direction:column;gap:2px;padding:16px 18px;border-radius:14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);max-width:440px;font-size:13px;line-height:1.6}.login-credit .lc-k{font-size:11.5px;letter-spacing:.3px;color:var(--accent);font-weight:700}.login-credit b{font-size:16px}.login-credit .en{color:inherit;opacity:.6;font-size:11.5px;text-align:right}' +
+  '.login-form .lcard{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:30px 28px;box-shadow:0 18px 50px rgba(0,0,0,.10);gap:18px}.lc-head{display:flex;flex-direction:column;gap:4px}.lc-head h2{margin:0}.lc-head .muted{font-size:12.5px}' +
+  'label.f.lf{gap:6px}label.f.lf .lt{display:flex;justify-content:space-between;align-items:baseline;gap:10px;color:var(--ink);font-size:12.5px}label.f.lf .lt .en{font-weight:500;color:var(--muted);font-size:11px}label.f.lf .inp{height:44px}' +
+  '.m-only{display:none}@media (max-width:980px){.login-brand{padding:24px 20px 26px;gap:12px}.login-brand .shield{width:72px}.login-brand .wordmark{width:min(280px,100%)}.login-brand .lb-text p:not(.lb-en){display:none}.login-brand .login-credit{display:none}.m-only{display:block}.login-form{padding:24px 16px 32px}.login-form .lcard{padding:22px 18px}}' +
   '.drop{border:2px dashed var(--line);border-radius:14px;padding:26px;text-align:center;cursor:pointer;background:var(--surface2)}.drop.on{border-color:var(--accent);background:var(--surface)}' +
   '.qrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:12.5px}' +
   '.formcode{display:flex;justify-content:space-between;align-items:center;gap:12px;border:2px solid #231D2B;border-radius:8px;padding:4px 12px;margin-top:6px}' +
