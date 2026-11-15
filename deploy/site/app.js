@@ -1251,7 +1251,7 @@ function empEditor(id) {
     var prof = { company: $('#e_co').value, brand: $('#e_br').value }; $$('[data-p]', m).forEach(function (i) { prof[i.dataset.p] = i.value.trim(); });
     var emp = { id: $('#e_id').value.trim(), name: $('#e_nm').value.trim(), code: $('#e_job').value, br_en: $('#e_bre').value.trim(), br_ar: $('#e_bra').value.trim(), rep: $('#e_rpe').value.trim(), rep_ar: $('#e_rpa').value.trim(), profile: prof };
     var btn = this; btn.disabled = true;
-    api('saveEmp', { emp: emp, isNew: isNew }).then(function (r) { return reloadData().then(function () { closeModal(); toast(isNew ? 'أُضيف الموظف' : 'تم حفظ بيانات الموظف'); var h = '#/emp/' + encodeURIComponent(r.emp[0]); if (location.hash === h) route(); else location.hash = h; }); })
+    api('saveEmp', { emp: emp, isNew: isNew }).then(function (r) { return reloadData().then(function () { closeModal(); toast(isNew ? 'أُضيف الموظف' : r.renamed ? 'تغيّر الاسم في كل مكان: ' + (r.renamed.evals || 0) + ' تقييم، ' + (r.renamed.records || 0) + ' سجل رسمي، ' + (r.renamed.signed || 0) + ' استمارة موقّعة، ' + (r.renamed.reports || 0) + ' موظف يرجع إليه' : 'تم حفظ بيانات الموظف'); var h = '#/emp/' + encodeURIComponent(r.emp[0]); if (location.hash === h) route(); else location.hash = h; }); })
       .catch(function (er) { btn.disabled = false; errBox('#e_msg', er); });
   };
   var del = $('#e_del'); if (del) del.onclick = function () { twoClick(del, 'تأكيد حذف الموظف؟', function () { api('deleteEmp', { id: id }).then(reloadData).then(function () { closeModal(); toast('حُذف الموظف'); location.hash = '#/emp'; }).catch(function (er) { errBox('#e_msg', er); }); }); };
@@ -1270,7 +1270,7 @@ function empCard(v, id) {
   var hist = (p.history || []).slice().reverse();
   var val = function (x) { return x ? esc(x) : '<span class="muted">—</span>'; };
   v.innerHTML = head(esc(e[1]), '<span class="num">' + esc(e[0]) + '</span> · ' + esc(j.ar), '<a href="#/emp">الموظفون</a> ‹ ' + esc(deptName(j.dept)),
-      '<a class="btn sec" href="#/jd/' + encodeURIComponent(e[2]) + '">' + ic('jd') + 'الوصف الوظيفي</a>' + (ed ? '<button class="btn sec" id="ce">' + ic('set') + 'تعديل البيانات</button>' : '') + (myDepts().indexOf(j.dept) >= 0 ? '<button class="btn sec" id="csr">' + ic('selfi') + 'طلب تقييم ذاتي</button>' : '') + '<a class="btn pri" href="#/eval?emp=' + encodeURIComponent(id) + '">' + ic('eval') + 'تقييم الموظف</a>') +
+      '<a class="btn sec" href="#/jd/' + encodeURIComponent(e[2]) + '">' + ic('jd') + 'الوصف الوظيفي</a>' + (JOB[e[2]] && JOB[e[2]].b && JOB[e[2]].b.purpose ? '<button class="btn sec" id="cjd">' + ic('print') + 'طباعة الوصف ومؤشرات الأداء</button>' : '') + (ed ? '<button class="btn sec" id="ce">' + ic('set') + 'تعديل البيانات</button>' : '') + (myDepts().indexOf(j.dept) >= 0 ? '<button class="btn sec" id="csr">' + ic('selfi') + 'طلب تقييم ذاتي</button>' : '') + '<a class="btn pri" href="#/eval?emp=' + encodeURIComponent(id) + '">' + ic('eval') + 'تقييم الموظف</a>') +
     '<div class="stack"><div class="card"><div class="bd pcard"><div class="pph"><div class="pphoto"><img id="pimg" alt="صورة ' + esc(e[1]) + '" hidden><span class="pinit">' + esc(initials) + '</span></div>' +
     (ed ? '<label class="btn sec sm" style="width:100%;justify-content:center;margin-top:8px">' + ic('plus') + 'تغيير الصورة<input type="file" id="pf" accept="image/*" hidden></label>' + (p.ph ? '<button class="btn sec sm" id="prm" style="width:100%;margin-top:6px">إزالة الصورة</button>' : '') : '') + '</div>' +
     '<div class="ov">' + kv('الاسم · Name', '<b>' + esc(e[1]) + '</b>') + kv('الرقم الوظيفي · ID', '<b class="num">' + esc(e[0]) + '</b>') + kv('المنصب · Position', esc(j.ar) + '<div class="en">' + esc(j.en) + ' · ' + esc(e[2]) + '</div>') +
@@ -1280,13 +1280,14 @@ function empCard(v, id) {
     '</div></div>' + (p.notes ? '<div class="bd" style="border-top:1px solid var(--line)"><b>ملاحظات</b><div style="white-space:pre-wrap">' + esc(p.notes) + '</div></div>' : '') + '</div>' +
     '<div class="card"><div class="hd"><h2>سجل الحركة والتنقل</h2><span class="en">Movements</span></div><div class="bd">' + (hist.length ? '<ol class="hist">' + hist.map(function (h) {
       var jt = function (c) { var x = JOB[c]; return x ? esc(x.ar) + ' <span class="num muted">' + esc(c) + '</span>' : esc(c || ''); };
-      return '<li><span class="num muted">' + esc(String(h.d).slice(0, 16)) + '</span> — ' + (h.t === 'hire' ? '<b>تعيين / إضافة</b> على ' + jt(h.to) : h.t === 'org' ? '<b>توزيع حسب الهيكل</b> إلى ' + esc(deptName(h.td)) + (h.unit ? ' — ' + esc(h.unit) : '') : '<b>نقل</b> من ' + jt(h.from) + ' (' + esc(deptName(h.fd)) + ') إلى ' + jt(h.to) + ' (' + esc(deptName(h.td)) + ')') + ' <span class="muted" style="font-size:11.5px">· ' + esc(h.by || '') + '</span></li>';
+      return '<li><span class="num muted">' + esc(String(h.d).slice(0, 16)) + '</span> — ' + (h.t === 'hire' ? '<b>تعيين / إضافة</b> على ' + jt(h.to) : h.t === 'rename' ? '<b>تغيير الاسم</b> من ' + esc(h.from) + ' إلى ' + esc(h.to) : h.t === 'org' ? '<b>توزيع حسب الهيكل</b> إلى ' + esc(deptName(h.td)) + (h.unit ? ' — ' + esc(h.unit) : '') : '<b>نقل</b> من ' + jt(h.from) + ' (' + esc(deptName(h.fd)) + ') إلى ' + jt(h.to) + ' (' + esc(deptName(h.td)) + ')') + ' <span class="muted" style="font-size:11.5px">· ' + esc(h.by || '') + '</span></li>';
     }).join('') + '</ol>' : '<div class="muted">لا توجد حركات مسجّلة. أي تغيير على منصب الموظف يُسجَّل هنا تلقائياً.</div>') + '</div></div>' +
     (isAdmin() ? '<div class="card"><div class="hd"><h2>الاستمارات الموقّعة ورقياً</h2><a class="btn sec sm" href="#/signed">' + ic('up') + 'رفع</a></div><div class="bd" id="csg"><div class="muted">…</div></div></div>' : '') +
     '<div class="card"><div class="hd"><h2>تقييماتي لهذا الموظف</h2></div><div class="bd" id="cev">' + evalTable(ev, false) + '</div></div></div>';
   loadPhoto(id, $('#pimg')); signedForEmp(id, $('#csg'));
   var csr = $('#csr'); if (csr) csr.onclick = function () { selfRequestModal(id); };
   $('#cev').onclick = function (x) { var r = x.target.closest('[data-ev]'); if (!r) return; var rec = ev.filter(function (y) { return y.id === r.dataset.ev; })[0]; if (rec) openEval(rec, isAdmin()); };
+  var cjd = $('#cjd'); if (cjd) cjd.onclick = function () { api('logView', { kind: 'jd-print', ref: e[2] + ' ' + id }).catch(function () {}); printPapers([jdPaper(j, e)]); };
   if (!ed) return;
   $('#ce').onclick = function () { empEditor(id); };
   $('#pf').onchange = function () {
@@ -1774,17 +1775,19 @@ function sigChain(r) {
   if (r.wf && r.wf.ceo) add('مصادقة الرئيس التنفيذي', 'CEO certification (exceptional)', '', '');
   return sigBoxes(list);
 }
-function jdPaper(j) {
-  var b = j.b, d = DEPT[j.dept] || {}, ov = b.ov || {};
+function jdPaper(j, emp) {
+  var b = j.b, d = DEPT[emp ? empDept(emp) : j.dept] || {}, ov = b.ov || {}, ep = emp ? profileOf(emp[0]) : null;
   var o = function (k, ar) { var x = ov[k]; return x && x.length ? '<tr><td class="k">' + ar + ' <span class="en">' + k + '</span></td><td>' + esc(x[0]) + (x[1] ? ' <span class="en">/ ' + esc(x[1]) + '</span>' : '') + '</td></tr>' : ''; };
-  return '<div class="paper">' + letterhead('الوصف الوظيفي', 'JOB DESCRIPTION', esc(j.code) + ' · v1.0') +
-    '<table><tr><td class="k">المسمى <span class="en">Title</span></td><td><b>' + esc(j.ar) + '</b> <span class="en">· ' + esc(j.en) + '</span></td></tr><tr><td class="k">القسم <span class="en">Department</span></td><td>' + esc(d.ar) + ' <span class="en">· ' + esc(d.en) + '</span></td></tr>' + o('Grade', 'الدرجة') + o('Reports To', 'المرجع') + o('Branches', 'مواقع العمل') + o('Employment Type', 'نوع التوظيف') + '</table>' +
+  return '<div class="paper">' + letterhead(emp ? 'الوصف الوظيفي ومؤشرات الأداء' : 'الوصف الوظيفي', emp ? 'JOB DESCRIPTION &amp; KPIs' : 'JOB DESCRIPTION', esc(j.code) + (emp ? ' · ' + esc(emp[0]) : '') + ' · v1.0') +
+    '<table>' + (emp ? '<tr><td class="k">الموظف <span class="en">Employee</span></td><td><b>' + esc(emp[1]) + '</b> <span class="num">· ' + esc(emp[0]) + '</span></td></tr>' +
+      (ep.unit || ep.title ? '<tr><td class="k">الوحدة والمنصب في الهيكل <span class="en">Unit &amp; org title</span></td><td>' + esc([deptName(empDept(emp)), ep.unit, ep.title].filter(Boolean).join(' — ')) + '</td></tr>' : '') +
+      '<tr><td class="k">موقع العمل <span class="en">Site</span></td><td>' + esc(emp[4] || emp[3] || '') + '</td></tr>' + ((emp[6] || emp[5]) ? '<tr><td class="k">المرجع المباشر للموظف <span class="en">Employee reports to</span></td><td>' + esc(emp[6] || emp[5]) + '</td></tr>' : '') : '') + '<tr><td class="k">المسمى <span class="en">Title</span></td><td><b>' + esc(j.ar) + '</b> <span class="en">· ' + esc(j.en) + '</span></td></tr><tr><td class="k">القسم <span class="en">Department</span></td><td>' + esc(d.ar) + ' <span class="en">· ' + esc(d.en) + '</span></td></tr>' + o('Grade', 'الدرجة') + o('Reports To', 'المرجع') + o('Branches', 'مواقع العمل') + o('Employment Type', 'نوع التوظيف') + '</table>' +
     '<div class="band"><span>الغرض من الوظيفة</span><span class="en">JOB PURPOSE</span></div><p style="margin:4px 0">' + esc(b.purpose[1]) + '</p><p class="en" style="margin:0">' + esc(b.purpose[0]) + '</p>' +
     '<div class="band"><span>المهام والمسؤوليات</span><span class="en">DUTIES</span></div><ol>' + b.duties.map(function (x) { return '<li>' + esc(x[1]) + ' <span class="en">— ' + esc(x[0]) + '</span></li>'; }).join('') + '</ol>' +
     '<div class="band"><span>مؤشرات الأداء الرئيسية</span><span class="en">KPIs</span></div><table><tr><th>#</th><th>المؤشر</th><th>الهدف</th><th>القياس</th><th>الدورية</th><th class="c">الوزن</th></tr>' + b.kpis.map(function (k, i) { return '<tr><td class="c num">' + (i + 1) + '</td><td>' + esc(k.ar || k.en) + '<br><span class="en">' + esc(k.en) + '</span></td><td>' + esc(k.t_ar || k.t_en) + '</td><td>' + esc(k.m_ar || k.m_en) + '</td><td>' + esc(k.f_ar || k.f_en) + '</td><td class="c num">' + k.w + '%</td></tr>'; }).join('') + '</table>' +
     '<div class="band"><span>المؤهلات والكفاءات</span><span class="en">QUALIFICATIONS &amp; COMPETENCIES</span></div><table>' + Object.keys(b.qual || {}).map(function (k) { return '<tr><td class="k">' + k + '</td><td>' + esc(b.qual[k][1]) + ' <span class="en">/ ' + esc(b.qual[k][0]) + '</span></td></tr>'; }).join('') +
     '<tr><td class="k">فنية <span class="en">Technical</span></td><td>' + (b.tech || []).map(function (x) { return esc(x[1] || x[0]); }).join(' · ') + '</td></tr><tr><td class="k">سلوكية <span class="en">Behavioural</span></td><td>' + (b.beh || []).map(function (x) { return esc(x[1] || x[0]); }).join(' · ') + '</td></tr></table>' +
-    (function () { var hd = splitHead(d.head_ar || d.head), rt = (ov['Reports To'] || []), l = [['شاغل الوظيفة (اطّلعت)', 'Job holder', '', '']];
+    (function () { var hd = splitHead(d.head_ar || d.head), rt = emp && (emp[6] || emp[5]) ? [String(emp[6] || emp[5]).split(' — ')[0]] : (ov['Reports To'] || []), l = [['شاغل الوظيفة (اطّلعت)', 'Job holder', emp ? emp[1] : '', emp ? emp[0] : '']];
       if (rt[1] || rt[0]) l.push(['المرجع المباشر', 'Reports to', rt[1] || rt[0], '']);
       if (hd[0] && hd[0] !== (rt[1] || rt[0])) l.push(['رئيس القسم', 'Head of department', hd[0], hd[1]]);
       l.push(['مدير الموارد البشرية', 'HR Manager', 'أوس فراس الشلال', 'Aws Firas Al-Shalal'], ['الاعتماد — المدير العام', 'Approval — General Manager', '', '']);

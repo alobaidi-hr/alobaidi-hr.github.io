@@ -233,6 +233,55 @@ const score = (v, allowNull) => {
   if ((v === null || v === undefined || v === '') && allowNull) return null;
   const n = Number(v); if (!(n >= 0 && n <= 10) || Math.round(n) !== n) err('invalid', 'درجة غير صالحة'); return n;
 };
+/* ---------- renaming an employee: the new name replaces the old one wherever it is a live label ----------
+   Frozen evidence keeps what was true when it was made: version snapshots, signatures, and the sealed content of
+   official records (its sha is untouched); the record's index line shows the current name with the old one beside it. */
+const sameName = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+const isLetter = (c) => !!c && /[\p{L}\p{N}]/u.test(c);
+const swapName = (txt, from, to) => {
+  const t = String(txt || ''), f = String(from || '').trim(); if (!t || !f) return t; if (sameName(t, f)) return to;
+  const lo = t.toLowerCase(), lf = f.toLowerCase(); let i = lo.indexOf(lf);
+  while (i >= 0) { if (!isLetter(t[i - 1]) && !isLetter(t[i + f.length])) return t.slice(0, i) + to + t.slice(i + f.length); i = lo.indexOf(lf, i + 1); }
+  return t;
+};
+function renameRefs(ed, id, from, to) {
+  /* edits only: other employees reporting to him, department heads, org placements */
+  let reports = 0, heads = 0;
+  for (const x of SEED.emps) {
+    if (x[0] === id) continue;
+    const r5 = swapName(x[5], from, to), r6 = swapName(x[6], from, to);
+    if (r5 !== String(x[5] || '') || r6 !== String(x[6] || '')) { const cur = (ed.emps && ed.emps[x[0]]) || x; ed.emps[x[0]] = [cur[0], cur[1], cur[2], cur[3], cur[4], r5, r6]; reports++; }
+    const pf = ed.profiles[x[0]]; if (pf && pf.mgr && swapName(pf.mgr, from, to) !== pf.mgr) { ed.profiles[x[0]] = { ...pf, mgr: swapName(pf.mgr, from, to) }; }
+  }
+  for (const d of SEED.depts) {
+    const h = swapName(d.head, from, to), ha = swapName(d.head_ar, from, to);
+    if (h !== String(d.head || '') || ha !== String(d.head_ar || '')) { ed.depts = { ...(ed.depts || {}), [String(d.no)]: { ...d, ...(ed.depts && ed.depts[String(d.no)]), head: h, head_ar: ha } }; heads++; }
+  }
+  if (ed.orgReport) for (const k of ['matched', 'manual']) for (const m of ed.orgReport[k] || []) if (m.id === id) m.name = to;
+  return { reports, heads };
+}
+async function renameStored(id, from, to) {
+  const out = { evals: 0, records: 0, signed: 0, selfs: 0, trash: 0 };
+  const all = await evals(); let ch = false;
+  for (const r of Object.values(all)) {
+    if (r.emp && r.emp.id === id && r.emp.name !== to) { r.emp.name = to; out.evals++; ch = true; }
+    if (r.emp && r.emp.id !== id && r.emp.rep && swapName(r.emp.rep, from, to) !== r.emp.rep) { r.emp.rep = swapName(r.emp.rep, from, to); ch = true; }
+  }
+  if (ch) await setJSON('evals', all);
+  const idx = await recIndex(); let rc = false;
+  for (const it of Object.values(idx.items)) if (it.emp && it.emp.id === id && it.emp.name !== to) { if (!it.emp.nameAtRecord) it.emp.nameAtRecord = it.emp.name; it.emp.name = to; out.records++; rc = true; }
+  if (rc) await setJSON('records', idx);
+  const sg = await getJSON('signed', {}); let sc = false;
+  for (const it of Object.values(sg)) if (it.empId === id && it.empName !== to) { it.empName = to; out.signed++; sc = true; }
+  if (sc) await setJSON('signed', sg);
+  const sf = await getJSON('selfs', {}); let fc = false;
+  for (const x of Object.values(sf)) if (x.emp && x.emp.id === id && x.emp.name !== to) { x.emp.name = to; out.selfs++; fc = true; }
+  if (fc) await setJSON('selfs', sf);
+  const tr = await getJSON('trash', {}); let tc = false;
+  for (const x of Object.values(tr)) if (x.emp && x.emp.id === id && x.emp.name !== to) { x.emp.name = to; out.trash++; tc = true; }
+  if (tc) await setJSON('trash', tr);
+  return out;
+}
 async function evals() { await migrateV3(); return getJSON('evals', {}); }
 /* incoming box for managers / GM / CEO: evaluations and self-assessments that reach them */
 async function boxItems(email, u) {
@@ -640,8 +689,12 @@ const R = {
     pf.history = pf.history || [];
     if (isNew) pf.history.push({ d: now(), t: 'hire', to: e[2], by: me.email });
     else if (old[2] !== e[2]) pf.history.push({ d: now(), t: 'move', from: old[2], to: e[2], fd: empDept(old), td: JOBS[e[2]].dept, by: me.email });
+    let renamed = null;
+    if (!isNew && old[1] !== e[1]) { pf.history.push({ d: now(), t: 'rename', from: old[1], to: e[1], by: me.email }); renamed = renameRefs(ed, e[0], old[1], e[1]); }
     pf.history = pf.history.slice(-50); ed.profiles[e[0]] = pf;
-    await setJSON('edits', ed); return { emp: e, profile: pf };
+    await setJSON('edits', ed);
+    if (renamed) { Object.assign(renamed, await renameStored(e[0], old[1], e[1])); await logVisit(me.email, me.u ? me.u.name : me.email, 'emp-rename', e[0] + ': ' + old[1] + ' > ' + e[1]); }
+    return { emp: e, profile: pf, renamed };
   },
   async deleteEmp({ token, id }) {
     await loadData(); const old = SEED.emps.find((x) => x[0] === id); if (!old) err('not_found', 'الموظف غير موجود');
