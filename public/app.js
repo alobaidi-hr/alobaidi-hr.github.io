@@ -219,9 +219,9 @@ function renderSetPassword(st, name) {
 /* ---------------------------------------------------------------- shell */
 var NAV = [
   ['', [['home', 'home', 'الرئيسية'], ['library', 'book', 'المكتبة التعليمية'], ['erp', 'erp', 'نظام ERP', 'erp/']]],
-  ['المرجع الوظيفي', [['jd', 'jd', 'الأوصاف الوظيفية'], ['kpi', 'kpi', 'مكتبة المؤشرات'], ['emp', 'emp', 'الموظفون'], ['org', 'emp', 'الهيكل التنظيمي'], ['gov', 'gov', 'مصفوفة الصلاحيات']]],
+  ['المرجع الوظيفي', [['jd', 'jd', 'الأوصاف الوظيفية'], ['kpi', 'kpi', 'مكتبة المؤشرات'], ['emp', 'emp', 'الموظفون'], ['org', 'emp', 'الهيكل التنظيمي'], ['gov', 'gov', 'مصفوفة الصلاحيات'], ['signed', 'up', 'الأوصاف والاستمارات الموقّعة']]],
   ['تقييم الأداء', [['box', 'inbox', 'الوارد'], ['eval', 'eval', 'تقييم موظف'], ['self', 'selfi', 'التقييم الذاتي'], ['mine', 'mine', 'تقييماتي'], ['approvals', 'check', 'الاعتمادات'], ['records', 'archive', 'الموافقات الرسمية المعتمدة']]],
-  ['الإدارة', [['inbox', 'inbox', 'صندوق النتائج'], ['signed', 'up', 'مكتبة الاستمارات الموقّعة'], ['archive', 'archive', 'الأرشيف الشامل'], ['trash', 'trash', 'سلة المحذوفات'], ['users', 'users', 'المستخدمون والأقسام'], ['activity', 'act', 'سجل الدخول والزيارات'], ['law', 'law', 'الامتثال القانوني'], ['settings', 'set', 'الإعدادات']], true]
+  ['الإدارة', [['inbox', 'inbox', 'صندوق النتائج'], ['archive', 'archive', 'الأرشيف الشامل'], ['trash', 'trash', 'سلة المحذوفات'], ['users', 'users', 'المستخدمون والأقسام'], ['activity', 'act', 'سجل الدخول والزيارات'], ['law', 'law', 'الامتثال القانوني'], ['settings', 'set', 'الإعدادات']], true]
 ];
 function renderShell() {
   var u = S.user, b = S.brand || {};
@@ -230,7 +230,7 @@ function renderShell() {
     var items = g[1].filter(function (n) { return !(role() === 'ops' && /^(eval|self|mine)$/.test(n[0])) && !(n[0] === 'box' && isAdmin()) && !(n[0] === 'records' && !canRecords()) && !(AUD && !/^(home|records|jd|kpi|gov|library)$/.test(n[0])); });
     if (!items.length) return '';
     return (g[0] ? '<div class="grp">' + g[0] + '</div>' : '') + items.map(function (n) {
-      return '<a class="nav" href="' + (n[3] || '#/' + n[0]) + '" data-r="' + n[0] + '">' + ic(n[1]) + '<span>' + n[2] + '</span>' + (n[0] === 'inbox' ? '<span class="badge" id="unread"' + (S.unread ? '' : ' hidden') + '>' + S.unread + '</span>' : '') + (n[0] === 'box' ? '<span class="badge" id="boxc"' + (S.boxUnread ? '' : ' hidden') + '>' + (S.boxUnread || 0) + '</span>' : '') + (n[0] === 'mine' ? '<span class="badge" id="minec">' + S.evals.length + '</span>' : '') + '</a>';
+      return '<a class="nav" href="' + (n[3] || '#/' + n[0]) + '" data-r="' + n[0] + '">' + ic(n[1]) + '<span>' + n[2] + '</span>' + (n[0] === 'inbox' ? '<span class="badge" id="unread"' + (S.unread ? '' : ' hidden') + '>' + S.unread + '</span>' : '') + (n[0] === 'box' ? '<span class="badge" id="boxc"' + (S.boxUnread ? '' : ' hidden') + '>' + (S.boxUnread || 0) + '</span>' : '') + (n[0] === 'mine' ? '<span class="badge" id="minec">' + S.evals.length + '</span>' : '') + (n[0] === 'signed' && isAdmin() ? '<span class="badge" id="sgc"' + (S.data.signedPending ? '' : ' hidden') + '>' + (S.data.signedPending || 0) + '</span>' : '') + '</a>';
     }).join('');
   }).join('');
   $('#app').innerHTML =
@@ -282,7 +282,7 @@ function route() {
   var h = (location.hash || '#/home').slice(2).split('?'), parts = h[0].split('/'), q = {};
   (h[1] || '').split('&').forEach(function (p) { var kv = p.split('='); if (kv[0]) q[kv[0]] = decodeURIComponent(kv[1] || ''); });
   var r = parts[0] || 'home', arg = parts[1] ? decodeURIComponent(parts[1]) : '';
-  var adminOnly = ['inbox', 'signed', 'archive', 'trash', 'users', 'activity', 'law', 'settings'];
+  var adminOnly = ['inbox', 'archive', 'trash', 'users', 'activity', 'law', 'settings'];
   if (adminOnly.indexOf(r) >= 0 && !isAdmin()) r = 'home';
   if (role() === 'auditor' && !/^(home|records|jd|kpi|gov|library)$/.test(r)) r = 'records';
   if (r === 'home' && role() === 'auditor') r = 'records';
@@ -1337,7 +1337,7 @@ function empCard(v, id) {
       var jt = function (c) { var x = JOB[c]; return x ? esc(x.ar) + ' <span class="num muted">' + esc(c) + '</span>' : esc(c || ''); };
       return '<li><span class="num muted">' + esc(String(h.d).slice(0, 16)) + '</span> — ' + (h.t === 'hire' ? '<b>تعيين / إضافة</b> على ' + jt(h.to) : h.t === 'renumber' ? '<b>تعديل الرقم الوظيفي</b> من <span class="num">' + esc(h.from) + '</span> إلى <span class="num">' + esc(h.to) + '</span>' : h.t === 'rename' ? '<b>تغيير الاسم</b> من ' + esc(h.from) + ' إلى ' + esc(h.to) : h.t === 'org' ? '<b>توزيع حسب الهيكل</b> إلى ' + esc(deptName(h.td)) + (h.unit ? ' — ' + esc(h.unit) : '') : '<b>نقل</b> من ' + jt(h.from) + ' (' + esc(deptName(h.fd)) + ') إلى ' + jt(h.to) + ' (' + esc(deptName(h.td)) + ')') + ' <span class="muted" style="font-size:11.5px">· ' + esc(h.by || '') + '</span></li>';
     }).join('') + '</ol>' : '<div class="muted">لا توجد حركات مسجّلة. أي تغيير على منصب الموظف يُسجَّل هنا تلقائياً.</div>') + '</div></div>' +
-    (isAdmin() ? '<div class="card"><div class="hd"><h2>الاستمارات الموقّعة ورقياً</h2><a class="btn sec sm" href="#/signed">' + ic('up') + 'رفع</a></div><div class="bd" id="csg"><div class="muted">…</div></div></div>' : '') +
+    (role() !== 'auditor' ? '<div class="card"><div class="hd"><h2>الأوصاف والاستمارات الموقّعة</h2><a class="btn sec sm" href="#/signed">' + ic('up') + 'رفع</a></div><div class="bd" id="csg"><div class="muted">…</div></div></div>' : '') +
     '<div class="card"><div class="hd"><h2>تقييماتي لهذا الموظف</h2></div><div class="bd" id="cev">' + evalTable(ev, false) + '</div></div></div>';
   loadPhoto(id, $('#pimg')); signedForEmp(id, $('#csg'));
   var csr = $('#csr'); if (csr) csr.onclick = function () { selfRequestModal(id); };
@@ -2412,15 +2412,19 @@ VIEWS.library = function (v) {
   load();
 };
 VIEWS.signed = function (v) {
-  if (!isAdmin()) { location.hash = '#/home'; return; }
-  var Q = [], list = [], q = '';
-  v.innerHTML = head('مكتبة الاستمارات الموقّعة', 'ارفع استمارات التقييم والأوصاف الوظيفية بعد التوقيع — يقرأ النظام رمز الاستمارة أو الرقم الوظيفي ويحفظ كل ملف في ملف صاحبه', '', '<button class="btn sec" id="sgr">' + ic('refresh') + 'تحديث</button>') +
-    '<div class="drop" id="sdz"><div style="font-size:15px;font-weight:700">' + ic('up').replace('<svg', '<svg width="22" height="22"') + ' اسحب الملفات هنا أو اضغط للاختيار</div><div class="muted" style="font-size:12.5px;margin-top:6px">PDF أو صور (ماسح ضوئي أو كاميرا الهاتف) · ملفات كثيرة دفعة واحدة · يُفضَّل أن يتضمن اسم الملف الرقم الوظيفي، وإلا يقرأ النظام رمز الاستمارة من الصفحة</div><input type="file" id="sfi" multiple accept="application/pdf,image/*" hidden></div>' +
-    '<div id="sq" style="margin-top:12px"></div><div class="card" style="margin-top:14px"><div class="hd"><h2>الاستمارات المحفوظة</h2><input class="inp" id="sgq" type="search" placeholder="بحث بالاسم أو الرقم" style="max-width:260px"></div><div class="bd" id="sgl"><div class="loading" style="min-height:14vh"><div class="spin"></div></div></div></div>';
+  if (role() === 'auditor') { location.hash = '#/records'; return; }
+  var ADM = isAdmin(), Q = [], list = [], q = '', TAB = ADM ? 'pending' : 'all', SEL = {};
+  v.innerHTML = head(ADM ? 'الأوصاف والاستمارات الموقّعة' : 'رفع الأوصاف والاستمارات الموقّعة',
+      ADM ? 'كل المستخدمين يرفعون الأوصاف الوظيفية والاستمارات بعد التوقيع، وتصل هنا للمراجعة. اعتمدها كلها أو حسب الموظف أو حسب القسم، وبعد الاعتماد تُحفظ في ملف صاحبها'
+        : 'ارفع الوصف الوظيفي أو الاستمارة بعد توقيع الموظف — يتعرّف النظام على صاحبها من الرقم الوظيفي، وتصل إلى مدير النظام للمراجعة والاعتماد قبل حفظها في ملفه',
+      '', '<button class="btn sec" id="sgr">' + ic('refresh') + 'تحديث</button>') +
+    '<div class="drop" id="sdz"><div style="font-size:15px;font-weight:700">' + ic('up').replace('<svg', '<svg width="22" height="22"') + ' اسحب الملفات هنا أو اضغط للاختيار</div><div class="muted" style="font-size:12.5px;margin-top:6px">PDF أو صور (ماسح ضوئي أو كاميرا الهاتف) · ملفات كثيرة دفعة واحدة · يُفضَّل أن يتضمن اسم الملف الرقم الوظيفي، وإلا يقرأ النظام الرقم أو رمز الاستمارة من الصفحة' + (ADM ? '' : ' · موظفو أقسامك فقط') + '</div><input type="file" id="sfi" multiple accept="application/pdf,image/*" hidden></div>' +
+    '<div id="sq" style="margin-top:12px"></div><div id="sgrev" style="margin-top:14px"></div>' +
+    '<div class="card" style="margin-top:14px"><div class="hd"><h2>' + (ADM ? 'المكتبة' : 'ما رفعته وملفات موظفي أقسامك') + '</h2><div class="actions"><div class="seg" id="sgt"></div><input class="inp" id="sgq" type="search" placeholder="بحث بالاسم أو الرقم" style="max-width:240px"></div></div><div class="bd" id="sgl"><div class="loading" style="min-height:14vh"><div class="spin"></div></div></div></div>';
   var empOpts = function (sel) { return '<option value="">— اختر الموظف —</option>' + S.data.emps.slice().sort(function (a, b) { return a[1] < b[1] ? -1 : 1; }).map(function (e) { return '<option value="' + esc(e[0]) + '"' + (e[0] === sel ? ' selected' : '') + '>' + esc(e[1]) + ' · ' + esc(e[0]) + '</option>'; }).join(''); };
   var drawQ = function () {
     $('#sq').innerHTML = Q.length ? '<div class="card"><div class="hd"><h2>الرفع الحالي (' + Q.filter(function (x) { return x.st === 'done'; }).length + '/' + Q.length + ')</h2></div><div class="bd">' + Q.map(function (x, i) {
-      var st = { wait: '<span class="pill rx">بالانتظار</span>', read: '<span class="pill r1">يقرأ الصفحة…</span>', up: '<span class="pill r1">يرفع…</span>', done: '<span class="pill r3">حُفظ في ملف ' + esc(x.empName || '') + '</span>', need: '<span class="pill r0">حدّد الموظف</span>', fail: '<span class="pill r0">' + esc(x.err || 'تعذّر') + '</span>' }[x.st];
+      var st = { wait: '<span class="pill rx">بالانتظار</span>', read: '<span class="pill r1">يقرأ الصفحة…</span>', up: '<span class="pill r1">يرفع…</span>', done: '<span class="pill r3">' + (isAdmin() ? 'حُفظ في ملف ' : 'أُرسل للمراجعة — ') + esc(x.empName || '') + '</span>', need: '<span class="pill r0">حدّد الموظف</span>', fail: '<span class="pill r0">' + esc(x.err || 'تعذّر') + '</span>' }[x.st];
       return '<div class="qrow"><div><b>' + esc(x.f.name) + '</b> ' + st + (x.why ? ' <span class="muted">— تعرّف بـ' + esc(x.why) + '</span>' : '') + '</div>' + (x.st === 'need' ? '<div class="actions"><select class="inp" data-qe="' + i + '" style="width:230px">' + empOpts(x.empId) + '</select><button class="btn pri sm" data-qs="' + i + '">حفظ</button></div>' : '<span></span>') + '</div>';
     }).join('') + '</div></div>' : '';
   };
@@ -2441,16 +2445,57 @@ VIEWS.signed = function (v) {
   dz.ondragover = function (e) { e.preventDefault(); dz.classList.add('on'); }; dz.ondragleave = function () { dz.classList.remove('on'); };
   dz.ondrop = function (e) { e.preventDefault(); dz.classList.remove('on'); add(e.dataTransfer.files); };
   $('#sq').onclick = function (e) { var b = e.target.closest('[data-qs]'); if (!b) return; var x = Q[+b.dataset.qs], id = $('[data-qe="' + b.dataset.qs + '"]').value; if (!id) return toast('اختر الموظف'); x.empId = id; x.why = 'اختيار يدوي'; upload(x, 'manual'); };
-  var drawL = function () {
-    var l = list.filter(function (x) { return !q || (x.empName + ' ' + x.empId + ' ' + x.file).toLowerCase().indexOf(q) >= 0; });
-    $('#sgl').innerHTML = l.length ? '<div class="tw"><table class="t minw"><thead><tr><th>الموظف</th><th>الاستمارة</th><th>الملف</th><th>طريقة التوزيع</th><th>رُفع</th><th></th></tr></thead><tbody>' + l.map(function (x) {
-      return '<tr><td>' + (x.empId ? '<a href="#/emp/' + encodeURIComponent(x.empId) + '"><b>' + esc(x.empName) + '</b></a><div class="num muted" style="font-size:11px">' + esc(x.empId) + '</div>' : '<span class="pill r0">غير موزّع</span>') + '</td><td>' + (x.kind === 'jd' ? '<span class="pill r1">وصف وظيفي ومؤشرات</span>' : x.evalId ? (TYPE[x.type] ? TYPE[x.type][1] : '') + ' <span class="num">' + esc(x.period) + '</span>' : '<span class="muted">—</span>') + '</td><td style="font-size:12px">' + esc(x.file) + '<div class="muted num">' + Math.round(x.size / 1024) + ' KB</div></td><td>' + ({ filename: 'اسم الملف', ocr: 'قراءة الصفحة', manual: 'يدوي' }[x.how] || '—') + '</td><td class="num" style="font-size:12px">' + esc(sigDate(x.at)) + '<div class="muted">' + esc(x.by) + '</div></td><td class="w"><div class="actions"><button class="btn sec sm" data-so="' + esc(x.id) + '">عرض</button><button class="btn sec sm" data-sa="' + esc(x.id) + '">نقل</button><button class="btn danger sm" data-sd="' + esc(x.id) + '">حذف</button></div></td></tr>';
-    }).join('') + '</tbody></table></div>' : '<div class="empty">لا توجد ملفات</div>';
+  var pend = function () { return list.filter(function (x) { return x.st === 'pending'; }); };
+  var setBadge = function () { var b = $('#sgc'); if (!b) return; var n = pend().length; S.data.signedPending = n; b.hidden = !n; b.textContent = n; };
+  var review = function (payload, label) {
+    var go = function (reason) { return api('signedReview', Object.assign({ reason: reason }, payload)).then(function (r) { toast((payload.act === 'approve' ? 'اعتُمد ' : 'رُفض ') + r.count + ' ملف' + (label ? ' — ' + label : '')); SEL = {}; load(); }).catch(function (er) { toast(er.message); }); };
+    if (payload.act === 'reject') return reasonModal('رفض الملفات', 'يُعاد الملف إلى من رفعه مع السبب، ولا يُحفظ في ملف الموظف.', 'سبب الرفض (إلزامي)', 'رفض', true).then(function (t) { if (t) go(t); });
+    return go('');
   };
-  var load = function () { return api('signedList').then(function (r) { list = r.items; drawL(); }).catch(function (e) { $('#sgl').innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; }); };
+  var drawRev = function () {
+    var box = $('#sgrev'); if (!ADM) { box.innerHTML = ''; return; }
+    var P = pend(); setBadge();
+    if (!P.length) { box.innerHTML = '<div class="card"><div class="bd" style="display:flex;gap:10px;align-items:center">' + ic('check') + '<span>لا توجد ملفات بانتظار المراجعة.</span></div></div>'; return; }
+    var depts = {}, emps = {}; P.forEach(function (x) { var d = x.dept || 0; depts[d] = (depts[d] || 0) + 1; if (x.empId) emps[x.empId] = { n: ((emps[x.empId] || {}).n || 0) + 1, name: x.empName }; });
+    var nsel = Object.keys(SEL).filter(function (k) { return SEL[k]; }).length;
+    box.innerHTML = '<div class="card" style="border-color:var(--accent)"><div class="hd"><h2>بانتظار المراجعة والاعتماد <span class="badge" style="position:static">' + P.length + '</span></h2><div class="actions"><button class="btn pri" data-rv="all">' + ic('check') + 'اعتماد الكل (' + P.length + ')</button></div></div><div class="bd stack">' +
+      '<div class="actions" style="flex-wrap:wrap"><label class="f" style="flex-direction:row;align-items:center;gap:8px;margin:0">حسب القسم<select class="inp" id="rvd" style="width:auto">' + Object.keys(depts).map(function (d) { return '<option value="' + d + '">' + esc(deptName(+d) || 'بلا قسم') + ' (' + depts[d] + ')</option>'; }).join('') + '</select></label><button class="btn sec sm" data-rv="dept">اعتماد القسم</button><button class="btn danger sm" data-rv="dept-x">رفض القسم</button></div>' +
+      '<div class="actions" style="flex-wrap:wrap"><label class="f" style="flex-direction:row;align-items:center;gap:8px;margin:0">حسب الموظف<select class="inp" id="rve" style="width:auto;max-width:280px">' + Object.keys(emps).sort(function (a, b) { return emps[a].name < emps[b].name ? -1 : 1; }).map(function (id) { return '<option value="' + esc(id) + '">' + esc(emps[id].name) + ' · ' + esc(id) + ' (' + emps[id].n + ')</option>'; }).join('') + '</select></label><button class="btn sec sm" data-rv="emp">اعتماد ملفات الموظف</button><button class="btn danger sm" data-rv="emp-x">رفض</button></div>' +
+      '<div class="actions"><span class="muted">المحدد في الجدول: <b class="num">' + nsel + '</b></span><button class="btn sec sm" data-rv="sel"' + (nsel ? '' : ' disabled') + '>اعتماد المحدد</button><button class="btn danger sm" data-rv="sel-x"' + (nsel ? '' : ' disabled') + '>رفض المحدد</button></div></div></div>';
+  };
+  var STL = { pending: ['r1', 'بانتظار المراجعة'], approved: ['r3', 'معتمد'], rejected: ['r0', 'مرفوض'] };
+  var drawL = function () {
+    var tabs = [['all', 'الكل'], ['pending', 'بانتظار المراجعة'], ['approved', 'معتمد'], ['rejected', 'مرفوض']];
+    $('#sgt').innerHTML = tabs.map(function (t) { var n = t[0] === 'all' ? list.length : list.filter(function (x) { return x.st === t[0]; }).length; return '<button class="btn sm ' + (TAB === t[0] ? 'pri' : 'sec') + '" data-tab="' + t[0] + '">' + t[1] + ' <span class="num">' + n + '</span></button>'; }).join('');
+    var l = list.filter(function (x) { return (TAB === 'all' || x.st === TAB) && (!q || (x.empName + ' ' + x.empId + ' ' + x.file + ' ' + x.by).toLowerCase().indexOf(q) >= 0); });
+    $('#sgl').innerHTML = l.length ? '<div class="tw"><table class="t minw"><thead><tr>' + (ADM ? '<th class="w"></th>' : '') + '<th>الموظف</th><th>الملف</th><th>الحالة</th><th>رفعه</th><th></th></tr></thead><tbody>' + l.map(function (x) {
+      var mine = x.email === S.user.email, canDel = ADM || (mine && x.st !== 'approved');
+      return '<tr>' + (ADM ? '<td class="w">' + (x.st === 'pending' ? '<input type="checkbox" data-ck="' + esc(x.id) + '"' + (SEL[x.id] ? ' checked' : '') + ' aria-label="تحديد">' : '') + '</td>' : '') +
+        '<td>' + (x.empId ? '<a href="#/emp/' + encodeURIComponent(x.empId) + '"><b>' + esc(x.empName) + '</b></a><div class="num muted" style="font-size:11px">' + esc(x.empId) + (x.dept ? ' · ' + esc(deptName(x.dept)) : '') + '</div>' : '<span class="pill r0">غير موزّع</span>') + '</td>' +
+        '<td>' + (x.kind === 'jd' ? '<span class="pill r1">وصف وظيفي ومؤشرات</span>' : x.evalId ? (TYPE[x.type] ? TYPE[x.type][1] : '') + ' <span class="num">' + esc(x.period) + '</span>' : '') + '<div style="font-size:12px">' + esc(x.file) + ' <span class="muted num">' + Math.round(x.size / 1024) + ' KB</span></div></td>' +
+        '<td><span class="pill ' + STL[x.st][0] + '">' + STL[x.st][1] + '</span>' + (x.revBy && x.st !== 'pending' ? '<div class="muted" style="font-size:11px">' + esc(x.revBy) + ' · <span class="num">' + esc(sigDate(x.revAt)) + '</span></div>' : '') + (x.revNote ? '<div style="font-size:11.5px;color:var(--bad)">' + esc(x.revNote) + '</div>' : '') + '</td>' +
+        '<td class="num" style="font-size:12px">' + esc(sigDate(x.at)) + '<div class="muted">' + esc(x.by) + '</div></td>' +
+        '<td class="w"><div class="actions"><button class="btn sec sm" data-so="' + esc(x.id) + '">عرض</button>' +
+        (ADM && x.st === 'pending' ? '<button class="btn pri sm" data-ok="' + esc(x.id) + '">اعتماد</button><button class="btn danger sm" data-no="' + esc(x.id) + '">رفض</button>' : '') +
+        (ADM ? '<button class="btn sec sm" data-sa="' + esc(x.id) + '">نقل</button>' : '') + (canDel ? '<button class="btn danger sm" data-sd="' + esc(x.id) + '">حذف</button>' : '') + '</div></td></tr>';
+    }).join('') + '</tbody></table></div>' : '<div class="empty">لا توجد ملفات' + (TAB === 'pending' ? ' بانتظار المراجعة' : '') + '</div>';
+  };
+  var load = function () { return api('signedList').then(function (r) { list = r.items; drawRev(); drawL(); }).catch(function (e) { $('#sgl').innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; }); };
   $('#sgq').oninput = function () { q = this.value.trim().toLowerCase(); drawL(); };
+  $('#sgt').onclick = function (e) { var b = e.target.closest('[data-tab]'); if (b) { TAB = b.dataset.tab; drawL(); } };
   $('#sgr').onclick = load;
+  $('#sgrev').onclick = function (e) {
+    var b = e.target.closest('[data-rv]'); if (!b) return; var k = b.dataset.rv, act = /-x$/.test(k) ? 'reject' : 'approve', base = k.replace('-x', '');
+    if (base === 'all') { if (!confirm('اعتماد كل الملفات المنتظرة (' + pend().length + ')؟')) return; return review({ act: 'approve', all: true }, 'الكل'); }
+    if (base === 'dept') { var d = $('#rvd').value; return review({ act: act, dept: +d }, deptName(+d)); }
+    if (base === 'emp') { var id = $('#rve').value; return review({ act: act, empId: id }, (EMP[id] || [])[1]); }
+    if (base === 'sel') { var ids = Object.keys(SEL).filter(function (k2) { return SEL[k2]; }); if (ids.length) return review({ act: act, ids: ids }); }
+  };
   $('#sgl').onclick = function (e) {
+    var c = e.target.closest('[data-ck]'); if (c) { SEL[c.dataset.ck] = c.checked; drawRev(); return; }
+    var ok = e.target.closest('[data-ok]'), no = e.target.closest('[data-no]');
+    if (ok) return review({ act: 'approve', ids: [ok.dataset.ok] });
+    if (no) return review({ act: 'reject', ids: [no.dataset.no] });
     var o = e.target.closest('[data-so]'), a = e.target.closest('[data-sa]'), d = e.target.closest('[data-sd]');
     if (o) openSigned(o.dataset.so);
     if (a) { modal('<div class="mbox narrow"><div class="card"><div class="hd"><h2>نقل الملف إلى موظف آخر</h2></div><div class="bd stack"><select class="inp" id="sae">' + empOpts('') + '</select><div class="actions"><button class="btn pri" id="sas">نقل</button><button class="btn sec" data-close>إلغاء</button></div></div></div></div>');
@@ -2459,6 +2504,7 @@ VIEWS.signed = function (v) {
   };
   load();
 };
+function sgPill(x) { return x.st === 'pending' ? '<span class="pill r1">بانتظار الاعتماد</span>' : x.st === 'rejected' ? '<span class="pill r0">مرفوض</span>' : ''; }
 function openSigned(id) {
   api('signedGet', { id: id }).then(function (r) {
     var it = r.item, view = /^data:application\/pdf/.test(r.data) ? '<iframe src="' + r.data + '" style="width:100%;height:75vh;border:0;border-radius:8px;background:#fff"></iframe>' : '<img src="' + r.data + '" alt="" style="max-width:100%;border-radius:8px">';
@@ -2466,9 +2512,9 @@ function openSigned(id) {
   }).catch(function (e) { toast(e.message); });
 }
 function signedForEmp(id, box) {
-  if (!isAdmin() || !box) return;
+  if (!box) return;
   api('signedList').then(function (r) { var l = r.items.filter(function (x) { return x.empId === id; });
-    box.innerHTML = l.length ? l.map(function (x) { return '<div class="qrow"><div><b>' + (x.kind === 'jd' ? 'الوصف الوظيفي ومؤشرات الأداء (موقّع)' : x.evalId ? (TYPE[x.type] ? TYPE[x.type][1] : '') + ' ' + esc(x.period) : esc(x.file)) + '</b> <span class="muted num">' + esc(sigDate(x.at)) + '</span></div><button class="btn sec sm" data-so="' + esc(x.id) + '">عرض</button></div>'; }).join('') : '<div class="muted">لا توجد استمارات موقّعة مرفوعة لهذا الموظف بعد.</div>';
+    box.innerHTML = l.length ? l.map(function (x) { return '<div class="qrow"><div><b>' + (x.kind === 'jd' ? 'الوصف الوظيفي ومؤشرات الأداء (موقّع)' : x.evalId ? (TYPE[x.type] ? TYPE[x.type][1] : '') + ' ' + esc(x.period) : esc(x.file)) + '</b> ' + sgPill(x) + ' <span class="muted num">' + esc(sigDate(x.at)) + '</span></div><button class="btn sec sm" data-so="' + esc(x.id) + '">عرض</button></div>'; }).join('') : '<div class="muted">لا توجد استمارات موقّعة مرفوعة لهذا الموظف بعد.</div>';
     box.onclick = function (e) { var b = e.target.closest('[data-so]'); if (b) openSigned(b.dataset.so); };
   }).catch(function () {});
 }

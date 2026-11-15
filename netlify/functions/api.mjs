@@ -261,6 +261,17 @@ async function logVisit(email, name, action, ref) {
   await setJSON('visits', v);
 }
 
+/* ---------- signed paper forms: who may upload and see ---------- */
+async function signedUser(token) { const a = await auth(token); if (roleOf(a.u) === 'auditor') err('forbidden', 'المدقق يطّلع على السجلات المعتمدة فقط'); return a; }
+function deptScope(email, u) { const dl = publicUser(email, u).depts; return (d) => dl === 'ALL' || dl.includes(Number(d)); }
+const sgState = (x) => (x.st ? x : { ...x, st: 'approved' });
+function sgDept(x) { const e = x.empId ? SEED.emps.find((y) => y[0] === x.empId) : null; return e ? empDept(e) : Number(x.dept) || 0; }
+function sgCanSee(email, u, it) { return u.role === 'admin' || it.email === email || (it.empId && deptScope(email, u)(sgDept(it))); }
+async function linkPaper(all, ev, item, u, email, noSave) {
+  ev.paper = { doc: item.id, at: now(), by: u.name }; ev.wf && logAct(ev, { name: u.name, email, cap: capOf(u) }, 'paper_signed', { note: item.file + (item.by !== u.name ? ' — رفعه ' + item.by : '') });
+  if (!noSave) await setJSON('evals', all);
+}
+
 /* ---------- auth ---------- */
 async function startSession(email, u, all) {
   const token = crypto.randomBytes(24).toString('hex');
@@ -649,6 +660,7 @@ const R = {
       res.settings.notify_email = st.notify_email || ''; res.settings.app_url = st.app_url || '';
       res.law = SEED.law; res.gaps = SEED.gaps;
       res.unread = Object.values(await evals()).filter((x) => !x.read).length;
+      res.signedPending = Object.values(await getJSON('signed', {})).filter((x) => x.st === 'pending').length;
     }
     res.boxUnread = (await boxItems(email, u)).filter((i) => i.unread).length;
     res.fx = st.fx || null; res.chain = await chainCfg();
@@ -1016,12 +1028,14 @@ const R = {
     R2.matched = (R2.matched || []).concat([{ n: chartName, id: String(empId), d: p.d, u: p.u, s: 0, by: u.name }]); await setJSON('edits', ed2); return r;
   },
 
-  /* ---------- signed paper forms: library, distributed to each employee ---------- */
+  /* ---------- signed paper forms: every user uploads for the employees in his scope; the admin reviews and approves ---------- */
   async signedUpload({ token, file = {} }) {
-    await loadData(); const { email, u } = await admin(token);
+    await loadData(); const { email, u } = await signedUser(token), adm = u.role === 'admin', inD = deptScope(email, u);
     const d = String(file.data || ''); if (!/^data:(application\/pdf|image\/(jpeg|png|webp));base64,/.test(d)) err('invalid', 'الصيغ المقبولة: PDF أو صورة');
     if (d.length > 5_500_000) err('too_large', 'الملف أكبر من 4 ميغابايت — صغّره أو قسّمه');
     const all = await evals(), e = file.empId ? SEED.emps.find((x) => x[0] === String(file.empId)) : null; if (file.empId && !e) err('invalid', 'الموظف غير موجود');
+    if (!adm && !e) err('invalid', 'حدّد الموظف صاحب الملف');
+    if (!adm && !inD(empDept(e))) err('forbidden', 'هذا الموظف ليس ضمن أقسامك');
     const kind = file.kind === 'jd' ? 'jd' : file.evalId ? 'eval' : 'other';
     const ev = kind !== 'jd' && file.evalId ? all[String(file.evalId)] : null; if (kind !== 'jd' && file.evalId && !ev) err('invalid', 'الاستمارة غير موجودة');
     if (ev && e && ev.emp.id !== e[0]) err('invalid', 'الاستمارة لا تخص هذا الموظف');
@@ -1029,27 +1043,52 @@ const R = {
     const id = 'SD' + crypto.randomBytes(5).toString('hex').toUpperCase(), ts = now();
     await setJSON('sdoc/' + id, { d });
     const item = { id, file: String(file.name || '').slice(0, 160), mime: d.slice(5, d.indexOf(';')), size: Math.round(d.length * 0.75), at: ts, by: u.name, email,
-      kind, empId: emp ? emp[0] : '', empName: emp ? emp[1] : '', evalId: ev ? ev.id : '', period: ev ? ev.period : '', type: ev ? ev.type : '', how: ['filename', 'ocr', 'manual'].includes(file.how) ? file.how : emp ? 'manual' : '' };
+      kind, empId: emp ? emp[0] : '', empName: emp ? emp[1] : '', dept: emp ? empDept(emp) : 0, evalId: ev ? ev.id : '', period: ev ? ev.period : '', type: ev ? ev.type : '', how: ['filename', 'ocr', 'manual'].includes(file.how) ? file.how : emp ? 'manual' : '',
+      st: adm ? 'approved' : 'pending' };
+    if (adm) Object.assign(item, { revBy: u.name, revAt: ts });
     const idx = await getJSON('signed', {}); idx[id] = item; await setJSON('signed', idx);
-    if (ev) { ev.paper = { doc: id, at: ts, by: u.name }; ev.wf && logAct(ev, { name: u.name, email, cap: capOf(u) }, 'paper_signed', { note: item.file }); await setJSON('evals', all); }
-    await logVisit(email, u.name, 'signed-upload', id + ' ' + (item.empId || 'unassigned')); return { item };
+    if (ev && adm) await linkPaper(all, ev, item, u, email);
+    await logVisit(email, u.name, 'signed-upload', id + ' ' + (item.empId || 'unassigned') + (adm ? '' : ' pending')); return { item };
   },
-  async signedList({ token }) { await admin(token); return { items: Object.values(await getJSON('signed', {})).sort((a, b) => (a.at < b.at ? 1 : -1)) }; },
+  async signedList({ token }) {
+    await loadData(); const { email, u } = await signedUser(token), inD = deptScope(email, u), adm = u.role === 'admin';
+    const items = Object.values(await getJSON('signed', {})).map(sgState).filter((x) => adm || x.email === email || (x.empId && inD(sgDept(x))));
+    return { items: items.sort((a, b) => (a.at < b.at ? 1 : -1)) };
+  },
   async signedGet({ token, id }) {
-    const { email, u } = await admin(token), it = (await getJSON('signed', {}))[id]; if (!it) err('not_found', 'الملف غير موجود');
-    const f = await getJSON('sdoc/' + id, null); if (!f) err('not_found', 'محتوى الملف غير موجود'); await logVisit(email, u.name, 'signed-open', id); return { item: it, data: f.d };
+    await loadData(); const { email, u } = await signedUser(token), it = (await getJSON('signed', {}))[id]; if (!it || !sgCanSee(email, u, it)) err('not_found', 'الملف غير موجود');
+    const f = await getJSON('sdoc/' + id, null); if (!f) err('not_found', 'محتوى الملف غير موجود'); await logVisit(email, u.name, 'signed-open', id); return { item: sgState(it), data: f.d };
   },
   async signedAssign({ token, id, empId, evalId }) {
     await loadData(); const { email, u } = await admin(token), idx = await getJSON('signed', {}), it = idx[id]; if (!it) err('not_found', 'الملف غير موجود');
     const all = await evals(), e = SEED.emps.find((x) => x[0] === String(empId)); if (!e) err('invalid', 'الموظف غير موجود');
     const ev = evalId && it.kind !== 'jd' ? all[String(evalId)] : null; if (evalId && it.kind !== 'jd' && (!ev || ev.emp.id !== e[0])) err('invalid', 'الاستمارة لا تخص هذا الموظف');
     if (it.evalId && all[it.evalId] && all[it.evalId].paper && all[it.evalId].paper.doc === id) delete all[it.evalId].paper;
-    Object.assign(it, { empId: e[0], empName: e[1], evalId: ev ? ev.id : '', period: ev ? ev.period : '', type: ev ? ev.type : '', how: 'manual', assignedBy: u.name, assignedAt: now() });
-    if (ev) ev.paper = { doc: id, at: now(), by: u.name };
+    Object.assign(it, { empId: e[0], empName: e[1], dept: empDept(e), evalId: ev ? ev.id : '', period: ev ? ev.period : '', type: ev ? ev.type : '', how: 'manual', assignedBy: u.name, assignedAt: now() });
+    if (ev && sgState(it).st === 'approved') ev.paper = { doc: id, at: now(), by: u.name };
     await setJSON('signed', idx); await setJSON('evals', all); await logVisit(email, u.name, 'signed-assign', id + ' > ' + e[0]); return { item: it };
   },
+  async signedReview({ token, act, ids, empId, dept, all: every, reason }) {
+    /* the admin approves or rejects what the users uploaded: chosen files, one employee, one department, or everything waiting */
+    await loadData(); const { email, u } = await admin(token);
+    if (!['approve', 'reject'].includes(act)) err('invalid', 'إجراء غير معروف');
+    if (act === 'reject') reason = needReason(reason);
+    const idx = await getJSON('signed', {}), want = Array.isArray(ids) ? new Set(ids.map(String)) : null;
+    if (!want && !empId && !dept && every !== true) err('invalid', 'حدّد الملفات أو الموظف أو القسم');
+    const pick = Object.values(idx).filter((x) => sgState(x).st === 'pending' && (want ? want.has(x.id) : empId ? x.empId === String(empId) : dept ? sgDept(x) === Number(dept) : true));
+    if (!pick.length) err('not_found', 'لا توجد ملفات بانتظار المراجعة بهذا الاختيار');
+    const evs = await evals(), ts = now(); let linked = 0;
+    for (const it of pick) {
+      Object.assign(it, { st: act === 'approve' ? 'approved' : 'rejected', revBy: u.name, revEmail: email, revAt: ts }); if (act === 'reject') it.revNote = reason; else delete it.revNote;
+      if (act === 'approve' && it.evalId && evs[it.evalId] && it.kind !== 'jd') { await linkPaper(evs, evs[it.evalId], it, u, email, true); linked++; }
+    }
+    await setJSON('signed', idx); if (linked) await setJSON('evals', evs);
+    await logVisit(email, u.name, 'signed-' + act, pick.length + (want ? ' files' : empId ? ' emp ' + empId : dept ? ' dept ' + dept : ' all') + (reason ? ' ' + reason.slice(0, 40) : ''));
+    return { count: pick.length, items: pick };
+  },
   async signedDelete({ token, id, reason }) {
-    const { email, u } = await admin(token); reason = needReason(reason); const idx = await getJSON('signed', {}), it = idx[id]; if (!it) err('not_found', 'الملف غير موجود');
+    const { email, u } = await signedUser(token); reason = needReason(reason); const idx = await getJSON('signed', {}), it = idx[id]; if (!it) err('not_found', 'الملف غير موجود');
+    if (u.role !== 'admin' && !(it.email === email && sgState(it).st !== 'approved')) err('forbidden', 'يحذف الرافع ملفه قبل اعتماده فقط');
     const all = await evals(); if (it.evalId && all[it.evalId] && all[it.evalId].paper && all[it.evalId].paper.doc === id) { delete all[it.evalId].paper; await setJSON('evals', all); }
     delete idx[id]; await setJSON('signed', idx); await store().delete('sdoc/' + id); await logVisit(email, u.name, 'signed-delete', id + ' ' + reason.slice(0, 60)); return {};
   },
