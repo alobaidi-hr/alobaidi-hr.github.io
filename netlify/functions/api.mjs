@@ -52,12 +52,14 @@ function runMigrations(B, ed) {
   ed = { ...ed, applied: [...(ed.applied || [])] };
   for (const m of MIGRATIONS) {
     if (ed.applied.includes(m.id)) continue;
+    if (m.ops.some((o) => o.op === 'orgChart') && !process.env.ORG_DATA_KEY) continue;
     const cur = () => applyEdits(B, ed), jobOf = (c) => cur().jobs.find((j) => j.code === c);
     const putJob = (j) => { ed.jobs = { ...(ed.jobs || {}), [j.code]: j }; };
     const putEmp = (e) => { ed.emps = { ...(ed.emps || {}), [e[0]]: e }; };
     for (const o of m.ops) {
       if (o.op === 'addJob' && !jobOf(o.job.code)) putJob(cleanJob(o.job));
       else if (o.op === 'jobReportsTo') for (const c of o.codes) { const j = jobOf(c); if (j) putJob({ ...j, b: { ...j.b, ov: { ...j.b.ov, 'Reports To': o.value } } }); }
+      else if (o.op === 'orgChart') { const r = applyOrgChart(cur(), ed, decryptOrg(o.enc), m.by); ed = r.ed; ed.orgReport = { ...r.report, id: m.id, at: now() }; }
       else if (o.op === 'jobPatch') { const j = jobOf(o.code); if (j) putJob(cleanJob({ ...j, b: { ...j.b, ...o.b, ov: { ...j.b.ov, ...(o.b.ov || {}) } } })); }
       else if (o.op === 'jobText') { const j = jobOf(o.code); if (j) putJob({ ...j, b: { ...j.b, duties: j.b.duties.map((p) => p.map((t) => String(t).split(o.from).join(o.to))) } }); }
       else if (o.op === 'moveEmp') {
@@ -72,6 +74,56 @@ function runMigrations(B, ed) {
   }
   return ed;
 }
+/* org-chart placements are personal data: they travel encrypted, the key lives only in the function's environment */
+function decryptOrg(enc) {
+  const key = Buffer.from(process.env.ORG_DATA_KEY || '', 'base64'); if (key.length !== 32) throw new Error('ORG_DATA_KEY');
+  const dc = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(enc.iv, 'base64')); dc.setAuthTag(Buffer.from(enc.tag, 'base64'));
+  return JSON.parse(Buffer.concat([dc.update(Buffer.from(enc.data, 'base64')), dc.final()]).toString('utf8'));
+}
+/* names written differently in different files: one spelling for matching only */
+const NAME_ALIAS = { mohamed: 'mohammed', muhammad: 'mohammed', mohammad: 'mohammed', mohamad: 'mohammed', mohammd: 'mohammed', abdulah: 'abdullah', abdalla: 'abdullah', abdallah: 'abdullah', abdulla: 'abdullah',
+  hassan: 'hasan', ahmad: 'ahmed', hussein: 'hussain', husain: 'hussain', hussin: 'hussain', husein: 'hussain', yousef: 'yousif', yusuf: 'yousif', yosif: 'yousif', khaled: 'khalid', omer: 'omar', satar: 'star', sattar: 'star',
+  qader: 'qadir', kader: 'qadir', sleman: 'sulaiman', suleiman: 'sulaiman', mahmood: 'mahmoud', mahmod: 'mahmoud', ibraheem: 'ibrahim', ismaeel: 'ismail', esmail: 'ismail', rasheed: 'rashid', hameed: 'hamid', majeed: 'majid', saeed: 'said', saed: 'said', sadek: 'sadiq', sadeq: 'sadiq', noori: 'nouri' };
+function nameKey(n) {
+  let t = String(n || '').toLowerCase().replace(/[^a-z\u0600-\u06ff ]+/g, ' ').split(/\s+/).filter(Boolean);
+  const out = []; for (let i = 0; i < t.length; i++) { let w = t[i];
+    if ((w === 'abdul' || w === 'abd' || w === 'al' || w === 'el') && t[i + 1]) { w = (w === 'abd' ? 'abdul' : w) + t[++i]; }
+    w = w.replace(/^al(?=[a-z]{3,})/, ''); out.push(NAME_ALIAS[w] || w); }
+  return out;
+}
+function nameScore(a, b) {
+  if (!a.length || !b.length) return 0; if (a.join(' ') === b.join(' ')) return 100;
+  if (a[0] !== b[0]) return 0;
+  const [sh, lg] = a.length <= b.length ? [a, b] : [b, a]; let j = 0;
+  for (const w of lg) if (j < sh.length && w === sh[j]) j++;          /* the shorter name, in order, inside the longer */
+  if (j === sh.length) return sh.length >= 3 ? 92 : 85;
+  let k = 0; while (k < sh.length && a[k] === b[k]) k++;                /* same first three names, different tail */
+  return k >= 3 ? 80 : 0;
+}
+/* place each person of the chart on the matching employee; unclear names are reported, never guessed */
+function applyOrgChart(D, ed, people, by) {
+  ed = { ...ed, emps: { ...(ed.emps || {}) }, profiles: { ...(ed.profiles || {}) } };
+  const emps = D.emps.map((e) => ({ e, k: nameKey(e[1]) })), used = new Set(), report = { matched: [], unmatched: [], ambiguous: [], notInChart: [] };
+  const city = (e) => String((e[3] || '') + ' ' + (e[4] || '')).toLowerCase();
+  const CITY = { Baghdad: /baghdad|\u0628\u063a\u062f\u0627\u062f|hq/, Erbil: /erbil|\u0623\u0631\u0628\u064a\u0644|\u0627\u0631\u0628\u064a\u0644/, Mosul: /mosul|\u0645\u0648\u0635\u0644/ };
+  for (const p of people) {
+    const k = nameKey(p.n); let c = emps.map((x) => ({ ...x, s: nameScore(k, x.k) })).filter((x) => x.s > 0 && !used.has(x.e[0]));
+    const best = Math.max(0, ...c.map((x) => x.s)); c = c.filter((x) => x.s === best);
+    if (c.length > 1 && p.c && CITY[p.c]) { const cc = c.filter((x) => CITY[p.c].test(city(x.e))); if (cc.length) c = cc; }
+    if (!c.length) { report.unmatched.push({ n: p.n, t: p.t, d: p.d, u: p.u }); continue; }
+    if (c.length > 1) { report.ambiguous.push({ n: p.n, t: p.t, d: p.d, u: p.u, ids: c.map((x) => x.e[0]) }); continue; }
+    const e = c[0].e; used.add(e[0]);
+    const pf = { ...(ed.profiles[e[0]] || {}) }, from = empDeptOf(D, e, pf);
+    Object.assign(pf, { dept: p.d, unit: p.u, unit_en: p.ue, title: p.t, mgr: p.m, lead: !!p.l, org: 'chart' });
+    if (from !== p.d) pf.history = [...(pf.history || []), { d: now(), t: 'org', fd: from, td: p.d, unit: p.u, by }].slice(-50);
+    ed.profiles[e[0]] = pf;
+    if (p.m) { const mp = people.find((x) => x.n === p.m); ed.emps[e[0]] = [e[0], e[1], e[2], e[3], e[4], p.m + (mp ? ' — ' + mp.t : ''), p.m + (mp ? ' — ' + mp.t : '')]; }
+    report.matched.push({ n: p.n, id: e[0], name: e[1], d: p.d, u: p.u, s: best });
+  }
+  for (const x of emps) if (!used.has(x.e[0])) report.notInChart.push({ id: x.e[0], name: x.e[1] });
+  return { ed, report };
+}
+const empDeptOf = (D, e, pf) => (pf && pf.dept ? Number(pf.dept) : ((D.jobs.find((j) => j.code === e[2]) || {}).dept || 0));
 function decrypt(pass) {
   const key = crypto.scryptSync(String(pass), Buffer.from(ENC.salt, 'base64'), 32, { N: 16384, r: 8, p: 1 });
   const buf = Buffer.from(ENC.data, 'base64'), tag = buf.subarray(buf.length - 16), body = buf.subarray(0, buf.length - 16);
@@ -109,7 +161,8 @@ function cleanPurpose(p) {
 const cleanSig = (x) => (typeof x === 'string' && /^data:image\/(png|jpeg|webp);base64,/.test(x) && x.length < 90000 ? x : '');
 const WF_NAMES = { employee: 'بانتظار توقيع الموظف', head: 'عند مدير القسم', hr: 'مراجعة الموارد البشرية', ops: 'عند مدير العمليات', gm: 'عند المدير العام', ceo: 'عند الرئيس التنفيذي', returned: 'مُعاد للمقيّم', done: 'معتمد نهائياً', cancelled: 'ملغاة' };
 const PROFILE_KEYS = ['phone', 'email', 'hire', 'birth', 'company', 'brand', 'grade', 'contract', 'nat', 'address', 'notes'];
-const empDept = (e) => (JOBS[e[2]] ? JOBS[e[2]].dept : 0);
+/* an employee's department: the org-structure placement when HR set one, otherwise the job's department */
+const empDept = (e) => { const pf = SEED && SEED.profiles && SEED.profiles[e[0]]; return pf && pf.dept ? Number(pf.dept) : (JOBS[e[2]] ? JOBS[e[2]].dept : 0); };
 
 async function settings() { return { ...PUB.settings, ...(await getJSON('settings', {})) }; }
 const publicSettings = (s) => ({ company_ar: s.company_ar, company_en: s.company_en, system_title: s.system_title, theme: s.theme, logo: s.logo || '' });
@@ -403,6 +456,7 @@ async function tombstone(r, me, reason) {
   await setJSON('purged', l.slice(-2000));
 }
 /* ---------- routes ---------- */
+const R_ = {} ;
 const R = {
   async branding() { return { settings: publicSettings(await settings()) }; },
 
@@ -485,7 +539,7 @@ const R = {
     const { email, u } = await auth(token), pu = publicUser(email, u), dl = pu.depts;
     const e = SEED.emps.find((x) => x[0] === String(rec.empId)); if (!e) err('invalid', 'الموظف غير موجود');
     const job = JOBS[e[2]]; if (!job) err('invalid', 'وظيفة الموظف غير معرّفة');
-    if (dl !== 'ALL' && !dl.includes(job.dept)) err('forbidden', 'هذا الموظف ليس ضمن قسمك');
+    const dept = empDept(e); if (dl !== 'ALL' && !dl.includes(dept)) err('forbidden', 'هذا الموظف ليس ضمن قسمك');
     if (!TYPES[rec.type]) err('invalid', 'نوع التقييم غير صالح');
     const period = String(rec.period || '').slice(0, 20); if (!period) err('invalid', 'حدد الفترة');
     const a = (rec.a || []).map((v) => score(v, true)), b = (rec.b || []).map((v) => score(v, false));
@@ -505,7 +559,7 @@ const R = {
     const ts = now(), id = ex ? ex.id : crypto.randomBytes(5).toString('hex').toUpperCase();
     const out = {
       id, created: ex ? ex.created : ts, updated: ts, submitted: ex ? (ex.submitted || ex.created) : ts, resubmitted: ex ? ts : '', type: rec.type, period,
-      emp: { id: e[0], name: e[1], code: e[2], dept: job.dept, br: e[4] || e[3], rep: e[6] || e[5] },
+      emp: { id: e[0], name: e[1], code: e[2], dept, br: e[4] || e[3], rep: e[6] || e[5] },
       a, b, ...c, n: { s: clip(n.s), d: clip(n.d), t: clip(n.t), g: clip(n.g) },
       pp, rcs: (Array.isArray(rec.rcs) ? rec.rcs : []).filter((x, i, a) => REC_KEYS.includes(x) && a.indexOf(x) === i),
       k: ex0 ? ex0.k : job.b.kpis.map((x) => ({ en: x.en, ar: x.ar, t_en: x.t_en, t_ar: x.t_ar, w: x.w })), cw: ex0 ? ex0.cw : SEED.crit.map((x) => [x[0], x[1], x[2]]),
@@ -635,12 +689,12 @@ const R = {
   async createSelf({ token, empId, type, period }) {
     await loadData(); const { email, u } = await auth(token), pu = publicUser(email, u);
     const e = SEED.emps.find((x) => x[0] === String(empId)); if (!e) err('not_found', 'الموظف غير موجود');
-    const job = JOBS[e[2]]; if (pu.depts !== 'ALL' && !pu.depts.includes(job.dept)) err('forbidden', 'هذا الموظف ليس ضمن قسمك');
+    const job = JOBS[e[2]], dept = empDept(e); if (pu.depts !== 'ALL' && !pu.depts.includes(dept)) err('forbidden', 'هذا الموظف ليس ضمن قسمك');
     if (!TYPES[type]) err('invalid', 'نوع التقييم غير صالح'); period = String(period || '').slice(0, 20); if (!period) err('invalid', 'حدد الفترة');
     const all = await getJSON('selfs', {});
     const open = Object.values(all).find((x) => x.emp.id === e[0] && x.type === type && x.period === period && x.status === 'open'); if (open) return { self: open };
     const code = crypto.randomBytes(9).toString('base64url');
-    const x = { code, emp: { id: e[0], name: e[1], code: e[2], dept: job.dept }, type, period, by: email, byName: u.name, created: now(), status: 'open',
+    const x = { code, emp: { id: e[0], name: e[1], code: e[2], dept }, type, period, by: email, byName: u.name, created: now(), status: 'open',
       k: job.b.kpis.map((k) => ({ en: k.en, ar: k.ar, t_en: k.t_en, t_ar: k.t_ar, w: k.w })), cw: SEED.crit.map((c) => [c[0], c[1], c[2], c[3], c[4]]) };
     all[code] = x; await setJSON('selfs', all); await logVisit(email, u.name, 'self-request', e[0] + ' ' + period); return { self: x };
   },
@@ -792,6 +846,89 @@ const R = {
     }
     if (apply) { await setJSON('evals', all); await logVisit(email, u.name, 'chain-apply', String(want ? want.size : out.length)); }
     return { items: out, applied: apply ? out.filter((x) => !want || want.has(x.id)).length : 0 };
+  },
+  /* ---------- org structure: placement report and manual placement ---------- */
+  async orgReport({ token }) { await admin(token); const ed = await getJSON('edits', {}); return { report: ed.orgReport || null }; },
+  async setOrg({ token, empId, dept, unit, title, mgr }) {
+    await loadData(); const { email, u } = await admin(token), e = SEED.emps.find((x) => x[0] === String(empId)); if (!e) err('not_found', 'الموظف غير موجود');
+    dept = Number(dept); if (dept && !SEED.depts.some((d) => d.no === dept)) err('invalid', 'القسم غير موجود');
+    const s = (v, n) => String(v == null ? '' : v).trim().slice(0, n);
+    const ed = await getJSON('edits', {}); ed.profiles = ed.profiles || {}; const pf = { ...(ed.profiles[e[0]] || {}) }, from = empDept(e);
+    if (dept) pf.dept = dept; else delete pf.dept;
+    pf.unit = s(unit, 120); pf.title = s(title, 120); pf.mgr = s(mgr, 120); pf.org = 'manual';
+    if (from !== (dept || (JOBS[e[2]] || {}).dept)) pf.history = [...(pf.history || []), { d: now(), t: 'org', fd: from, td: dept || (JOBS[e[2]] || {}).dept, unit: pf.unit, by: email }].slice(-50);
+    ed.profiles[e[0]] = pf;
+    if (pf.mgr) { ed.emps = ed.emps || {}; ed.emps[e[0]] = [e[0], e[1], e[2], e[3], e[4], pf.mgr, pf.mgr]; }
+    if (ed.orgReport) { const R = ed.orgReport; R.unmatched = (R.unmatched || []); R.notInChart = (R.notInChart || []).filter((x) => x.id !== e[0]); R.manual = (R.manual || []).concat([{ id: e[0], name: e[1], d: dept, u: pf.unit, at: now(), by: u.name }]).slice(-500); }
+    await setJSON('edits', ed); await logVisit(email, u.name, 'org-set', e[0] + ' > ' + dept); return { profile: pf };
+  },
+  async orgResolve({ token, chartName, empId }) {
+    /* a chart name that did not match: HR picks the employee, the chart placement is applied to him */
+    const { u } = await admin(token), ed = await getJSON('edits', {}), R = ed.orgReport; if (!R) err('not_found', 'لا يوجد تقرير هيكل');
+    const p = [...(R.unmatched || []), ...(R.ambiguous || [])].find((x) => x.n === chartName); if (!p) err('not_found', 'الاسم غير موجود في قائمة غير المطابَق');
+    const r = await R_.setOrg({ token, empId, dept: p.d, unit: p.u, title: p.t, mgr: '' });
+    const ed2 = await getJSON('edits', {}); const R2 = ed2.orgReport; R2.unmatched = (R2.unmatched || []).filter((x) => x.n !== chartName); R2.ambiguous = (R2.ambiguous || []).filter((x) => x.n !== chartName);
+    R2.matched = (R2.matched || []).concat([{ n: chartName, id: String(empId), d: p.d, u: p.u, s: 0, by: u.name }]); await setJSON('edits', ed2); return r;
+  },
+
+  /* ---------- signed paper forms: library, distributed to each employee ---------- */
+  async signedUpload({ token, file = {} }) {
+    await loadData(); const { email, u } = await admin(token);
+    const d = String(file.data || ''); if (!/^data:(application\/pdf|image\/(jpeg|png|webp));base64,/.test(d)) err('invalid', 'الصيغ المقبولة: PDF أو صورة');
+    if (d.length > 5_500_000) err('too_large', 'الملف أكبر من 4 ميغابايت — صغّره أو قسّمه');
+    const all = await evals(), e = file.empId ? SEED.emps.find((x) => x[0] === String(file.empId)) : null; if (file.empId && !e) err('invalid', 'الموظف غير موجود');
+    const ev = file.evalId ? all[String(file.evalId)] : null; if (file.evalId && !ev) err('invalid', 'الاستمارة غير موجودة');
+    if (ev && e && ev.emp.id !== e[0]) err('invalid', 'الاستمارة لا تخص هذا الموظف');
+    const emp = e || (ev ? SEED.emps.find((x) => x[0] === ev.emp.id) : null);
+    const id = 'SD' + crypto.randomBytes(5).toString('hex').toUpperCase(), ts = now();
+    await setJSON('sdoc/' + id, { d });
+    const item = { id, file: String(file.name || '').slice(0, 160), mime: d.slice(5, d.indexOf(';')), size: Math.round(d.length * 0.75), at: ts, by: u.name, email,
+      empId: emp ? emp[0] : '', empName: emp ? emp[1] : '', evalId: ev ? ev.id : '', period: ev ? ev.period : '', type: ev ? ev.type : '', how: ['filename', 'ocr', 'manual'].includes(file.how) ? file.how : emp ? 'manual' : '' };
+    const idx = await getJSON('signed', {}); idx[id] = item; await setJSON('signed', idx);
+    if (ev) { ev.paper = { doc: id, at: ts, by: u.name }; ev.wf && logAct(ev, { name: u.name, email, cap: capOf(u) }, 'paper_signed', { note: item.file }); await setJSON('evals', all); }
+    await logVisit(email, u.name, 'signed-upload', id + ' ' + (item.empId || 'unassigned')); return { item };
+  },
+  async signedList({ token }) { await admin(token); return { items: Object.values(await getJSON('signed', {})).sort((a, b) => (a.at < b.at ? 1 : -1)) }; },
+  async signedGet({ token, id }) {
+    const { email, u } = await admin(token), it = (await getJSON('signed', {}))[id]; if (!it) err('not_found', 'الملف غير موجود');
+    const f = await getJSON('sdoc/' + id, null); if (!f) err('not_found', 'محتوى الملف غير موجود'); await logVisit(email, u.name, 'signed-open', id); return { item: it, data: f.d };
+  },
+  async signedAssign({ token, id, empId, evalId }) {
+    await loadData(); const { email, u } = await admin(token), idx = await getJSON('signed', {}), it = idx[id]; if (!it) err('not_found', 'الملف غير موجود');
+    const all = await evals(), e = SEED.emps.find((x) => x[0] === String(empId)); if (!e) err('invalid', 'الموظف غير موجود');
+    const ev = evalId ? all[String(evalId)] : null; if (evalId && (!ev || ev.emp.id !== e[0])) err('invalid', 'الاستمارة لا تخص هذا الموظف');
+    if (it.evalId && all[it.evalId] && all[it.evalId].paper && all[it.evalId].paper.doc === id) delete all[it.evalId].paper;
+    Object.assign(it, { empId: e[0], empName: e[1], evalId: ev ? ev.id : '', period: ev ? ev.period : '', type: ev ? ev.type : '', how: 'manual', assignedBy: u.name, assignedAt: now() });
+    if (ev) ev.paper = { doc: id, at: now(), by: u.name };
+    await setJSON('signed', idx); await setJSON('evals', all); await logVisit(email, u.name, 'signed-assign', id + ' > ' + e[0]); return { item: it };
+  },
+  async signedDelete({ token, id, reason }) {
+    const { email, u } = await admin(token); reason = needReason(reason); const idx = await getJSON('signed', {}), it = idx[id]; if (!it) err('not_found', 'الملف غير موجود');
+    const all = await evals(); if (it.evalId && all[it.evalId] && all[it.evalId].paper && all[it.evalId].paper.doc === id) { delete all[it.evalId].paper; await setJSON('evals', all); }
+    delete idx[id]; await setJSON('signed', idx); await store().delete('sdoc/' + id); await logVisit(email, u.name, 'signed-delete', id + ' ' + reason.slice(0, 60)); return {};
+  },
+
+  /* ---------- direct link for the ERP: read-only feed behind a key the owner issues ---------- */
+  async erpKey({ token, regenerate }) {
+    const { email, u } = await admin(token); if (!isOwner(u)) err('forbidden', 'مفتاح الربط يصدره مالك النظام فقط');
+    const s = await getJSON('settings', {});
+    if (!regenerate) return { active: !!s.erpKeyHash, issued: s.erpKeyAt || '', last: s.erpLastPull || '' };
+    const key = 'lohr_' + crypto.randomBytes(24).toString('base64url');
+    s.erpKeyHash = crypto.createHash('sha256').update(key).digest('hex'); s.erpKeyAt = now(); s.erpKeyBy = u.name; await setJSON('settings', s);
+    await logVisit(email, u.name, 'erp-key', 'issued'); return { key, active: true, issued: s.erpKeyAt };
+  },
+  async erpFeed({ key }) {
+    const s = await getJSON('settings', {}); if (!s.erpKeyHash || !key) err('auth', 'مفتاح الربط غير صالح');
+    const h = crypto.createHash('sha256').update(String(key)).digest(); if (!crypto.timingSafeEqual(h, Buffer.from(s.erpKeyHash, 'hex'))) err('auth', 'مفتاح الربط غير صالح');
+    await loadData();
+    const evs = Object.values(await evals()).filter((r) => r.wf && r.wf.stage === 'done');
+    s.erpLastPull = now(); await setJSON('settings', s); await logVisit('erp', 'ERP', 'erp-pull', evs.length + ' evals');
+    return { feed: { format: 'lo-hr.feed', version: 1, exportedAt: now(), source: 'L-O HR System',
+      departments: SEED.depts.map((d) => ({ no: d.no, en: d.en, ar: d.ar })),
+      jobs: SEED.jobs.map((j) => ({ code: j.code, dept: j.dept, en: j.en, ar: j.ar, b: j.b })),
+      employees: SEED.emps.map((e) => { const pf = SEED.profiles[e[0]] || {}; return { id: e[0], name: e[1], job: e[2], dept: empDept(e), unit: pf.unit || '', title: pf.title || '', manager: pf.mgr || e[5] || '', branch: e[3] || '' }; }),
+      evaluations: evs.map((r) => ({ id: r.id, empId: r.emp.id, type: r.type, period: r.period, score: r.F, rating: r.r, recommendations: r.rcs || r.rc, version: r.v, approvedAt: r.doneAt || '', record: r.recordRef || '',
+        action: r.pp && r.pp.k !== 'periodic' ? { kind: r.pp.k, effective: r.pp.date || '', pct: r.pp.pct, iqd: r.pp.iqd, usd: r.pp.usd, currency: r.pp.cur, newBasic: r.pp.newBase, jobTo: r.pp.job || '', titleTo: r.pp.titleTo || '', gradeTo: r.pp.gradeTo || '' } : null })) } };
   },
   async saveFx({ token, rate }) {
     const { email, u } = await admin(token), x = Number(rate); if (!(x > 0 && x < 1e6)) err('invalid', 'سعر الصرف غير صالح');
@@ -1018,6 +1155,7 @@ const R = {
   },
 };
 
+Object.assign(R_, R);
 export default async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
   if (req.method === 'GET') return ok({ service: 'L-O HR API', version: '1.0' });

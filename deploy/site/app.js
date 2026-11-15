@@ -79,7 +79,7 @@ function index() {
 }
 var isAdmin = function () { return S.user && S.user.role === 'admin'; };
 var myDepts = function () { return S.user.depts === 'ALL' ? S.data.depts.map(function (d) { return d.no; }) : S.user.depts; };
-var empDept = function (e) { var j = JOB[e[2]]; return j ? j.dept : 0; };
+var empDept = function (e) { var p = profileOf(e[0]); if (p.dept) return +p.dept; var j = JOB[e[2]]; return j ? j.dept : 0; };
 var deptName = function (no) { var d = DEPT[no]; return d ? d.ar : ''; };
 
 /* ---------------------------------------------------------------- api */
@@ -219,9 +219,9 @@ function renderSetPassword(st, name) {
 /* ---------------------------------------------------------------- shell */
 var NAV = [
   ['', [['home', 'home', 'الرئيسية'], ['erp', 'erp', 'نظام ERP', 'erp/']]],
-  ['المرجع الوظيفي', [['jd', 'jd', 'الأوصاف الوظيفية'], ['kpi', 'kpi', 'مكتبة المؤشرات'], ['emp', 'emp', 'الموظفون'], ['gov', 'gov', 'مصفوفة الصلاحيات']]],
+  ['المرجع الوظيفي', [['jd', 'jd', 'الأوصاف الوظيفية'], ['kpi', 'kpi', 'مكتبة المؤشرات'], ['emp', 'emp', 'الموظفون'], ['org', 'emp', 'الهيكل التنظيمي'], ['gov', 'gov', 'مصفوفة الصلاحيات']]],
   ['تقييم الأداء', [['box', 'inbox', 'الوارد'], ['eval', 'eval', 'تقييم موظف'], ['self', 'selfi', 'التقييم الذاتي'], ['mine', 'mine', 'تقييماتي'], ['approvals', 'check', 'الاعتمادات'], ['records', 'archive', 'الموافقات الرسمية المعتمدة']]],
-  ['الإدارة', [['inbox', 'inbox', 'صندوق النتائج'], ['archive', 'archive', 'الأرشيف الشامل'], ['trash', 'trash', 'سلة المحذوفات'], ['users', 'users', 'المستخدمون والأقسام'], ['activity', 'act', 'سجل الدخول والزيارات'], ['law', 'law', 'الامتثال القانوني'], ['settings', 'set', 'الإعدادات']], true]
+  ['الإدارة', [['inbox', 'inbox', 'صندوق النتائج'], ['signed', 'up', 'مكتبة الاستمارات الموقّعة'], ['archive', 'archive', 'الأرشيف الشامل'], ['trash', 'trash', 'سلة المحذوفات'], ['users', 'users', 'المستخدمون والأقسام'], ['activity', 'act', 'سجل الدخول والزيارات'], ['law', 'law', 'الامتثال القانوني'], ['settings', 'set', 'الإعدادات']], true]
 ];
 function renderShell() {
   var u = S.user, b = S.brand || {};
@@ -282,7 +282,7 @@ function route() {
   var h = (location.hash || '#/home').slice(2).split('?'), parts = h[0].split('/'), q = {};
   (h[1] || '').split('&').forEach(function (p) { var kv = p.split('='); if (kv[0]) q[kv[0]] = decodeURIComponent(kv[1] || ''); });
   var r = parts[0] || 'home', arg = parts[1] ? decodeURIComponent(parts[1]) : '';
-  var adminOnly = ['inbox', 'archive', 'trash', 'users', 'activity', 'law', 'settings'];
+  var adminOnly = ['inbox', 'signed', 'archive', 'trash', 'users', 'activity', 'law', 'settings'];
   if (adminOnly.indexOf(r) >= 0 && !isAdmin()) r = 'home';
   if (role() === 'auditor' && !/^(home|records|jd|kpi|gov)$/.test(r)) r = 'records';
   if (r === 'home' && role() === 'auditor') r = 'records';
@@ -478,7 +478,7 @@ VIEWS.emp = function (v, id) {
       var j = JOB[e[2]] || {};
       return (!n || e[1].toLowerCase().indexOf(n) >= 0) && (!i || e[0].toLowerCase().indexOf(i) >= 0) && (!jq || ((j.ar || '') + ' ' + (j.en || '') + ' ' + e[2]).toLowerCase().indexOf(jq) >= 0) && (!st.dept || String(empDept(e)) === String(st.dept));
     });
-    $('#eb').innerHTML = rows.map(function (e) { var j = JOB[e[2]] || {}; return '<tr class="click" data-id="' + esc(e[0]) + '"><td class="num">' + esc(e[0]) + '</td><td><b>' + esc(e[1]) + '</b></td><td>' + esc(j.ar) + '<div class="en">' + esc(j.en) + '</div></td><td>' + esc(deptName(j.dept)) + '</td><td>' + (function (p) { return esc(orgName('companies', p.company)) + (p.brand ? '<div class="muted" style="font-size:11.5px">' + esc(orgName('brands', p.brand)) + '</div>' : ''); })(profileOf(e[0])) + '</td><td>' + esc(e[4] || e[3]) + '</td><td>' + esc(e[6] || e[5]) + '</td></tr>'; }).join('') || '<tr><td colspan="7"><div class="empty">لا توجد نتائج</div></td></tr>';
+    $('#eb').innerHTML = rows.map(function (e) { var j = JOB[e[2]] || {}; return '<tr class="click" data-id="' + esc(e[0]) + '"><td class="num">' + esc(e[0]) + '</td><td><b>' + esc(e[1]) + '</b></td><td>' + esc(j.ar) + '<div class="en">' + esc(j.en) + '</div></td><td>' + esc(deptName(empDept(e))) + (profileOf(e[0]).unit ? '<div class="muted" style="font-size:11px">' + esc(profileOf(e[0]).unit) + '</div>' : '') + '</td><td>' + (function (p) { return esc(orgName('companies', p.company)) + (p.brand ? '<div class="muted" style="font-size:11.5px">' + esc(orgName('brands', p.brand)) + '</div>' : ''); })(profileOf(e[0])) + '</td><td>' + esc(e[4] || e[3]) + '</td><td>' + esc(e[6] || e[5]) + '</td></tr>'; }).join('') || '<tr><td colspan="7"><div class="empty">لا توجد نتائج</div></td></tr>';
   };
   $$('[data-k]', v).forEach(function (el) { el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', function () { st[el.dataset.k] = el.value; draw(); }); });
   $('#eb').onclick = function (e) { var r = e.target.closest('[data-id]'); if (r) location.hash = '#/emp/' + encodeURIComponent(r.dataset.id); };
@@ -867,15 +867,16 @@ function openEval(rec, admin) {
   modal('<div class="mbox"><div class="mtool">' +
     '<button class="btn pri sm" id="mp">' + ic('print') + 'طباعة</button><button class="btn sec sm" id="mpdf">' + ic('dl') + 'PDF</button><button class="btn sec sm" id="mdoc">' + ic('dl') + 'Word</button>' + (rec.self ? '<label class="chk" title="يشمل الطباعة وPDF وWord"><input type="checkbox" id="mself"' + (PAPER_SELF ? ' checked' : '') + '> مقارنة التقييم الذاتي بالنتائج</label>' : '') +
     (admin ? '<label class="f" style="flex-direction:row;align-items:center;gap:6px">الحالة <select class="inp" id="mst" style="width:auto;padding:4px 8px">' + STATUS.filter(function (s) { return s[0] !== 'signed' || rec.status === 'signed'; }).map(function (s) { return '<option value="' + s[0] + '"' + (s[0] === rec.status ? ' selected' : '') + '>' + s[1] + '</option>'; }).join('') + '</select></label>' : '') +
-    (canEdit ? '<a class="btn sec sm" href="#/eval/' + encodeURIComponent(rec.id) + '">تعديل</a>' : '') + (rec.v ? '<span class="tag num" title="رقم النسخة / جولة الاعتماد">النسخة ' + rec.v + (rec.wf && rec.wf.round ? ' · الجولة ' + rec.wf.round : '') + '</span>' : '') + hrTools(rec) +
+    (canEdit ? '<a class="btn sec sm" href="#/eval/' + encodeURIComponent(rec.id) + '">تعديل</a>' : '') + (rec.paper && admin ? '<button class="btn sec sm" id="mpsg">' + ic('check') + 'الاستمارة الموقّعة</button>' : '') + (rec.v ? '<span class="tag num" title="رقم النسخة / جولة الاعتماد">النسخة ' + rec.v + (rec.wf && rec.wf.round ? ' · الجولة ' + rec.wf.round : '') + '</span>' : '') + hrTools(rec) +
     '<span class="grow"></span>' + (canDel ? '<span id="mdel"><button class="btn danger sm" id="md">حذف</button></span>' : '') +
     '<button class="btn sec sm" data-close>إغلاق ✕</button><span class="msg" id="mm" style="width:100%"></span></div><div id="wfbox">' + wfPanel(rec) + '</div>' + hrChangesHtml(rec) + auditLogHtml(rec) + '<div class="paperwrap">' + evalPaper(rec) + '</div></div>');
   wfBind(rec, admin); hrBind(rec, admin);
-  $('#mpdf').onclick = function () { paperPDF(rec); };
+  $('#mpdf').onclick = function () { paperPDF(rec, true); };
+  var mps = $('#mpsg'); if (mps) mps.onclick = function () { openSigned(rec.paper.doc); };
   var ms = $('#mself'); if (ms) ms.onchange = function () { PAPER_SELF = ms.checked; $('.paperwrap').innerHTML = evalPaper(rec); };
   $('#mdoc').onclick = function () { paperDOCX(rec); };
   $('#mp').onclick = function () {
-    printPapers([evalPaper(rec)]);
+    printPapers([printEval(rec)]);
     if (admin && rec.status === 'new') setEvalStatus(rec, 'printed');
   };
   if (admin && $('#mst') && $('#mdel')) $('#mdel').hidden = false;
@@ -1140,9 +1141,9 @@ VIEWS.settings = function (v) {
     '<div class="actions"><button class="btn pri" id="ss">حفظ الإعدادات</button></div><div class="msg" id="sm"></div></div></div>' +
     '<div class="card"><div class="hd"><h2>الشعار</h2></div><div class="bd stack"><div style="display:flex;gap:16px;align-items:center"><img id="lg" src="' + esc(shieldSrc()) + '" alt="" style="height:90px;background:var(--surface2);border-radius:8px;padding:6px"><div class="muted" style="font-size:12.5px">الشعار الحالي لشركة الليث العبيدي مدمج في النظام. يمكنك استبداله بصورة أخرى (PNG بخلفية شفافة).</div></div>' +
     '<label class="btn sec" style="width:max-content">اختيار صورة<input type="file" id="lf" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden></label><button class="btn sec sm" id="lr" style="width:max-content">إرجاع الشعار الأصلي</button></div></div></div>' +
-    '<div class="stack" style="margin-top:16px">' + (S.user.owner ? chainCard() : '') + fxCard() + erpCard() + deptsCard() + orgsCard() + critCard() + '</div>';
+    '<div class="stack" style="margin-top:16px">' + (S.user.owner ? chainCard() + erpLinkCard() : '') + fxCard() + erpCard() + deptsCard() + orgsCard() + critCard() + '</div>';
   var xb = $('#erpx'); if (xb) xb.onclick = exportERP;
-  if (S.user.owner) chainBind();
+  if (S.user.owner) { chainBind(); erpLinkBind(); }
   $('#fx_s').onclick = function () { api('saveFx', { rate: $('#fx_v').value }).then(function (r) { S.data.fx = r.fx; toast('حُفظ سعر الصرف'); route(); }).catch(function (e) { toast(e.message); }); };
   var logo = s.logo || '';
   $('#lf').onchange = function () {
@@ -1273,16 +1274,17 @@ function empCard(v, id) {
     '<div class="stack"><div class="card"><div class="bd pcard"><div class="pph"><div class="pphoto"><img id="pimg" alt="صورة ' + esc(e[1]) + '" hidden><span class="pinit">' + esc(initials) + '</span></div>' +
     (ed ? '<label class="btn sec sm" style="width:100%;justify-content:center;margin-top:8px">' + ic('plus') + 'تغيير الصورة<input type="file" id="pf" accept="image/*" hidden></label>' + (p.ph ? '<button class="btn sec sm" id="prm" style="width:100%;margin-top:6px">إزالة الصورة</button>' : '') : '') + '</div>' +
     '<div class="ov">' + kv('الاسم · Name', '<b>' + esc(e[1]) + '</b>') + kv('الرقم الوظيفي · ID', '<b class="num">' + esc(e[0]) + '</b>') + kv('المنصب · Position', esc(j.ar) + '<div class="en">' + esc(j.en) + ' · ' + esc(e[2]) + '</div>') +
-    kv('القسم · Department', esc(deptName(j.dept))) + kv('الشركة · Company', val(orgName('companies', p.company))) + kv('البراند · Brand', val(orgName('brands', p.brand))) +
+    kv('القسم · Department', esc(deptName(empDept(e))) + (p.unit ? '<div class="en">' + esc(p.unit) + '</div>' : '')) + (p.title ? kv('المنصب في الهيكل · Org title', esc(p.title)) : '') + kv('الشركة · Company', val(orgName('companies', p.company))) + kv('البراند · Brand', val(orgName('brands', p.brand))) +
     kv('موقع العمل · Site', val(e[4] || e[3])) + kv('المرجع المباشر · Reports to', val(e[6] || e[5])) +
     PF.map(function (f) { return kv(f[1] + ' · ' + f[2], f[0] === 'email' && p.email ? '<a href="mailto:' + esc(p.email) + '" dir="ltr">' + esc(p.email) + '</a>' : f[0] === 'phone' && p.phone ? '<a href="tel:' + esc(p.phone) + '" dir="ltr">' + esc(p.phone) + '</a>' : val(p[f[0]])); }).join('') +
     '</div></div>' + (p.notes ? '<div class="bd" style="border-top:1px solid var(--line)"><b>ملاحظات</b><div style="white-space:pre-wrap">' + esc(p.notes) + '</div></div>' : '') + '</div>' +
     '<div class="card"><div class="hd"><h2>سجل الحركة والتنقل</h2><span class="en">Movements</span></div><div class="bd">' + (hist.length ? '<ol class="hist">' + hist.map(function (h) {
       var jt = function (c) { var x = JOB[c]; return x ? esc(x.ar) + ' <span class="num muted">' + esc(c) + '</span>' : esc(c || ''); };
-      return '<li><span class="num muted">' + esc(String(h.d).slice(0, 16)) + '</span> — ' + (h.t === 'hire' ? '<b>تعيين / إضافة</b> على ' + jt(h.to) : '<b>نقل</b> من ' + jt(h.from) + ' (' + esc(deptName(h.fd)) + ') إلى ' + jt(h.to) + ' (' + esc(deptName(h.td)) + ')') + ' <span class="muted" style="font-size:11.5px">· ' + esc(h.by || '') + '</span></li>';
+      return '<li><span class="num muted">' + esc(String(h.d).slice(0, 16)) + '</span> — ' + (h.t === 'hire' ? '<b>تعيين / إضافة</b> على ' + jt(h.to) : h.t === 'org' ? '<b>توزيع حسب الهيكل</b> إلى ' + esc(deptName(h.td)) + (h.unit ? ' — ' + esc(h.unit) : '') : '<b>نقل</b> من ' + jt(h.from) + ' (' + esc(deptName(h.fd)) + ') إلى ' + jt(h.to) + ' (' + esc(deptName(h.td)) + ')') + ' <span class="muted" style="font-size:11.5px">· ' + esc(h.by || '') + '</span></li>';
     }).join('') + '</ol>' : '<div class="muted">لا توجد حركات مسجّلة. أي تغيير على منصب الموظف يُسجَّل هنا تلقائياً.</div>') + '</div></div>' +
+    (isAdmin() ? '<div class="card"><div class="hd"><h2>الاستمارات الموقّعة ورقياً</h2><a class="btn sec sm" href="#/signed">' + ic('up') + 'رفع</a></div><div class="bd" id="csg"><div class="muted">…</div></div></div>' : '') +
     '<div class="card"><div class="hd"><h2>تقييماتي لهذا الموظف</h2></div><div class="bd" id="cev">' + evalTable(ev, false) + '</div></div></div>';
-  loadPhoto(id, $('#pimg'));
+  loadPhoto(id, $('#pimg')); signedForEmp(id, $('#csg'));
   var csr = $('#csr'); if (csr) csr.onclick = function () { selfRequestModal(id); };
   $('#cev').onclick = function (x) { var r = x.target.closest('[data-ev]'); if (!r) return; var rec = ev.filter(function (y) { return y.id === r.dataset.ev; })[0]; if (rec) openEval(rec, isAdmin()); };
   if (!ed) return;
@@ -1600,10 +1602,10 @@ function loadScript(src) {
 }
 function fileBase(r) { return 'L-O_Evaluation_' + r.emp.id + '_' + r.period.replace(/[^A-Za-z0-9-]/g, '') + '_' + r.id; }
 function saveBlob(blob, name) { var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 800); }
-function paperPDF(rec) {
+function paperPDF(rec, forPrint) {
   toast('جارٍ إنشاء ملف PDF…');
   return Promise.all([loadScript(VENDOR + 'html2canvas.min.js'), loadScript(VENDOR + 'jspdf.umd.min.js')]).then(function () {
-    var host = document.createElement('div'); host.className = 'pdfhost'; host.innerHTML = evalPaper(rec); document.body.appendChild(host);
+    var host = document.createElement('div'); host.className = 'pdfhost'; host.innerHTML = forPrint ? printEval(rec) : evalPaper(rec); document.body.appendChild(host);
     var paper = $('.paper', host), parts = { h: document.createElement('div'), b: document.createElement('div'), f: document.createElement('div') };
     Object.keys(parts).forEach(function (k) { parts[k].className = 'paper pdfpart'; host.appendChild(parts[k]); });
     Array.prototype.slice.call(paper.children).forEach(function (c) { (c.classList.contains('lh') || c.classList.contains('stripe') ? parts.h : c.classList.contains('ft') ? parts.f : parts.b).appendChild(c); });
@@ -1633,6 +1635,7 @@ function paperPDF(rec) {
 }
 function b64bytes(d) { var s = atob(String(d).split(',')[1] || ''), u = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; }
 function imgSize(d) { return new Promise(function (res) { var i = new Image(); i.onload = function () { res([i.width, i.height]); }; i.onerror = function () { res([1, 1]); }; i.src = d; }); }
+var PRINT_DOCX = true;
 function paperDOCX(r) {
   toast('جارٍ إنشاء ملف Word…');
   var sigs = r.wf ? r.wf.sig : {}, imgs = [shieldSrc(), (window.LO_IMG && LO_IMG.wordmark) || ''].concat(['emp', 'mgr', 'hr', 'gm', 'ceo', 'head', 'ops'].map(function (k) { return sigs[k] && sigs[k].img || ''; }));
@@ -1665,7 +1668,7 @@ function paperDOCX(r) {
     var recs = (r.rcs || r.rc).map(function (k) { return REC[k][0]; }).join('، ') || '—';
     var strip = function (h) { var t = document.createElement('div'); t.innerHTML = h; return t.textContent; };
     body.push(table([{ cells: [H('سبب التقييم'), { v: PP[pp.k][1] + (ppDetail(pp) ? ' — ' + ppDetail(pp) : '') + (pp.date ? ' · نافذ ' + pp.date : '') }] }].concat(pp.why ? [{ cells: [H('المبررات'), { v: pp.why }] }] : []).concat(raiseLines(pp).concat(promoLines(pp)).map(function (l) { return { cells: [H(l[0]), { v: strip(l[1]) }] }; })).concat([{ cells: [H('التوصيات'), { v: recs }] }]), [20, 80]));
-    if (r.versions) {
+    if (r.versions && !PRINT_DOCX) {
       body.push(band('ملاحظات وتعديلات الموارد البشرية / مالك النظام', 'HR / OWNER NOTES & CHANGES'));
       body.push(P(run('النسخة ' + (r.v || 1) + ' من ' + r.versions.length + ' (الأحدث)' + (r.submitted ? ' · الرفع الأصلي ' + r.submitted : '') + (r.resubmitted ? ' · إعادة الرفع ' + r.resubmitted : ''), { size: 15 })));
       var hv = hrChanges(r);
@@ -1678,13 +1681,15 @@ function paperDOCX(r) {
     }
     body.push(band('الملاحظات', 'COMMENTS'));
     body.push(table([{ cells: [H('نقاط القوة'), { v: r.n.s || '—' }, H('مجالات التحسين'), { v: r.n.d || '—' }] }, { cells: [H('الاحتياجات التدريبية'), { v: r.n.t || '—' }, H('أهداف الفترة القادمة'), { v: r.n.g || '—' }] }, { cells: [H('ملاحظات الموظف'), { v: r.n.e || '—', span: 3 }] }], [15, 35, 15, 35]));
-    body.push(band('التواقيع وسلسلة الاعتماد', 'SIGNATURES & APPROVAL CHAIN'));
+    body.push(band(PRINT_DOCX ? 'التواقيع' : 'التواقيع وسلسلة الاعتماد', PRINT_DOCX ? 'SIGNATURES' : 'SIGNATURES & APPROVAL CHAIN'));
     var chain = [['mgr', 'المقيِّم', r.ev.name], ['emp', 'الموظف (اطّلع ووقّع)', r.emp.name], ['hr', 'مراجعة الموارد البشرية', (sigs.hr && sigs.hr.name) || 'أوس فراس الشلال'], ['gm', 'الاعتماد — المدير العام', sigs.gm && sigs.gm.name]].concat(r.wf && r.wf.ceo ? [['ceo', 'مصادقة الرئيس التنفيذي', sigs.ceo && sigs.ceo.name]] : []);
     var wf0 = r.wf || {};
     if (sigs.head || (wf0.head && wf0.head.email && !wf0.head.skipped)) chain.splice(2, 0, ['head', 'مدير القسم', (sigs.head && sigs.head.name) || wf0.head.name]);
     if (sigs.ops || wf0.ops) chain.splice(chain.findIndex(function (c) { return c[0] === 'gm'; }), 0, ['ops', 'مدير العمليات', (sigs.ops && sigs.ops.name) || wf0.ops.name]);
     var ki = { emp: 2, mgr: 3, hr: 4, gm: 5, ceo: 6, head: 7, ops: 8 };
+    if (PRINT_DOCX) { var dm = deptManagerOf(r); chain = [['dm', 'مدير القسم — ' + (dm[1] || ''), dm[0]], ['empp', 'الموظف — اطّلعت على التقييم', r.emp.name + ' · ' + r.emp.id]]; }
     body.push(table([{ cells: chain.map(function (c, i) { return H((i + 1) + ' · ' + c[1]); }) }, { cells: chain.map(function (c) { var s = sigs[c[0]], im = s && s.img ? pic(ki[c[0]], 34) : null; return { v: [P(im ? [im] : [run(s && s.paper ? 'توقيع ورقي' : ' ')], { al: D.AlignmentType.CENTER, sb: 40 }), P(run(c[2] || '', { b: true, size: 15 }), { al: D.AlignmentType.CENTER }), P(run(s && s.at ? (s.paper ? 'توقيع ورقي' : 'موقّع إلكترونياً') : 'التوقيع والتاريخ', { size: 13, c: '6B6470' }), { al: D.AlignmentType.CENTER }), P(run(s && s.at ? 'التاريخ: \u2066' + sigDate(s.at) + '\u2069' : ' ', { b: true, size: 14 }), { al: D.AlignmentType.CENTER })] }; }) }]));
+    if (PRINT_DOCX) body.push(P([run('رمز الاستمارة للأرشفة: ', { size: 15 }), run(formCode(r) + ' · ' + r.emp.id, { b: true, size: 22 })], { sb: 120, al: D.AlignmentType.CENTER }));
     var header = new D.Header({ children: [new D.Table({ visuallyRightToLeft: true, width: { size: 100, type: D.WidthType.PERCENTAGE }, borders: D.TableBorders.NONE, rows: [new D.TableRow({ children: [
       new D.TableCell({ width: { size: 50, type: D.WidthType.PERCENTAGE }, borders: { top: { style: D.BorderStyle.NONE }, bottom: { style: D.BorderStyle.NONE }, left: { style: D.BorderStyle.NONE }, right: { style: D.BorderStyle.NONE } }, children: [P([pic(0, 46), run('  ')].concat(pic(1, 26) ? [pic(1, 26)] : []).filter(Boolean))] }),
       new D.TableCell({ width: { size: 50, type: D.WidthType.PERCENTAGE }, borders: { top: { style: D.BorderStyle.NONE }, bottom: { style: D.BorderStyle.NONE }, left: { style: D.BorderStyle.NONE }, right: { style: D.BorderStyle.NONE } }, children: [P(run('استمارة تقييم الأداء الوظيفي', { b: true, size: 22 }), { al: D.AlignmentType.END }), P(run('EMPLOYEE PERFORMANCE EVALUATION', { size: 13, c: '6B6470' }), { al: D.AlignmentType.END }), P(run('HR-EVAL-' + r.id + ' · ' + ((S.brand || {}).company_ar || 'شركة الليث العبيدي'), { size: 13, c: '6B6470' }), { al: D.AlignmentType.END })] })] })] }),
@@ -1732,7 +1737,7 @@ function evalPaper(r) {
     '<div class="band"><span>التوصيات</span><span class="en">RECOMMENDATIONS</span></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 12px;margin-top:5px">' + recAll.map(function (k) { return '<div>' + box((r.rcs || r.rc).indexOf(k) >= 0) + REC[k][0] + ' <span class="en">' + REC[k][1] + '</span>' + (r.rcs && r.rc.indexOf(k) >= 0 ? ' <span class="en">(مقترح آلياً)</span>' : '') + '</div>'; }).join('') + '</div>' +
     '<div class="notes">' + [['s', 'نقاط القوة', 'Strengths'], ['d', 'مجالات التحسين', 'Improvement'], ['t', 'الاحتياجات التدريبية', 'Training'], ['g', 'أهداف الفترة القادمة', 'Goals']].map(function (n) { return '<div><div class="lb">' + n[1] + ' <span class="en">' + n[2] + '</span></div><div class="box">' + esc(r.n[n[0]]) + '</div></div>'; }).join('') + '</div>' +
     '<div class="notes" style="grid-template-columns:1fr"><div><div class="lb">ملاحظات الموظف <span class="en">Employee comments</span></div><div class="box">' + esc((r.n && r.n.e) || '') + '</div></div></div>' +
-    (r.versions ? hrChangesHtml(r, true) : '') + (r.wf ? wfSigChain(r) : sigChain(r)) + paperFoot() + '</div>';
+    (PAPER_PRINT ? printSigs(r) : (r.versions ? hrChangesHtml(r, true) : '') + (r.wf ? wfSigChain(r) : sigChain(r))) + paperFoot() + '</div>';
 }
 /* signature boxes along the reporting chain: employee › evaluator › department head › department reference › HR › final approval */
 function sigBoxes(list) {
@@ -1797,7 +1802,7 @@ window.addEventListener('afterprint', function () { document.body.classList.remo
 /* ================================================================ v3: raise, versions, HR/owner actions, approvals register */
 var CAP_AR = { owner: 'مالك النظام', hr: 'الموارد البشرية', evaluator: 'المقيّم', head: 'مدير القسم', ops: 'مدير العمليات', gm: 'المدير العام', ceo: 'الرئيس التنفيذي', auditor: 'المدقق الداخلي', employee: 'الموظف' };
 var VKIND = { submit: 'الإرسال الأول', resubmit: 'إعادة إرسال من المقيّم', hr_edit: 'تعديل الموارد البشرية / المالك', correction: 'تصحيح معتمد بطلب', migrated: 'النسخة الأصلية (قبل نظام النسخ)' };
-var ACT_AR = { deleted: 'حذف الاستمارة (مالك النظام)', submit: 'إرسال التقييم', resubmit: 'إعادة الإرسال', 'employee-sign': 'توقيع الموظف', hr_forward: 'إحالة الموارد البشرية إلى المدير العام', hr_return: 'إعادة إلى المقيّم', gm_approve: 'اعتماد المدير العام', gm_return: 'إعادة من المدير العام', ceo_approve: 'مصادقة الرئيس التنفيذي', ceo_return: 'إعادة من الرئيس التنفيذي', set_ceo: 'تغيير مصادقة الرئيس التنفيذي', paper_ack: 'تسجيل توقيع ورقي للموظف', head_approve: 'اعتماد مدير القسم', head_return: 'إعادة من مدير القسم', ops_approve: 'اعتماد مدير العمليات', ops_return: 'إعادة من مدير العمليات', chain_applied: 'تطبيق السلسلة الجديدة (إلى مدير القسم)', hr_edit: 'تعديل الموارد البشرية', recall: 'استرجاع', cancel: 'إلغاء', correction: 'تصحيح معتمد', record_cancelled: 'إلغاء السجل المعتمد' };
+var ACT_AR = { paper_signed: 'رفع الاستمارة الموقّعة ورقياً', deleted: 'حذف الاستمارة (مالك النظام)', submit: 'إرسال التقييم', resubmit: 'إعادة الإرسال', 'employee-sign': 'توقيع الموظف', hr_forward: 'إحالة الموارد البشرية إلى المدير العام', hr_return: 'إعادة إلى المقيّم', gm_approve: 'اعتماد المدير العام', gm_return: 'إعادة من المدير العام', ceo_approve: 'مصادقة الرئيس التنفيذي', ceo_return: 'إعادة من الرئيس التنفيذي', set_ceo: 'تغيير مصادقة الرئيس التنفيذي', paper_ack: 'تسجيل توقيع ورقي للموظف', head_approve: 'اعتماد مدير القسم', head_return: 'إعادة من مدير القسم', ops_approve: 'اعتماد مدير العمليات', ops_return: 'إعادة من مدير العمليات', chain_applied: 'تطبيق السلسلة الجديدة (إلى مدير القسم)', hr_edit: 'تعديل الموارد البشرية', recall: 'استرجاع', cancel: 'إلغاء', correction: 'تصحيح معتمد', record_cancelled: 'إلغاء السجل المعتمد' };
 var EXEC_AR = { na: ['لا يوجد أثر تنفيذي', 'rx'], scheduled: ['مجدول قبل تاريخ النفاذ', 'r1'], due: ['مستحق التنفيذ', 'r1'], executed: ['نُفّذ', 'r3'], reversal_pending: ['بانتظار عكس الأثر', 'r0'], reversed: ['عُكس الأثر', 'r2'], adjust_pending: ['بانتظار التسوية', 'r0'], adjusted: ['سُوّي', 'r2'], cancelled: ['أُلغي التنفيذ', 'rx'] };
 var RSTAT_AR = { active: ['سارٍ', 'r3'], superseded: ['مستبدل', 'r1'], cancelled: ['ملغى', 'r0'] };
 var CR_AR = { pending_ops: ['بانتظار مدير العمليات', 'r1'], pending_gm: ['بانتظار المدير العام', 'r1'], pending_ceo: ['بانتظار الرئيس التنفيذي', 'r1'], approved: ['معتمد', 'r3'], rejected: ['مرفوض', 'r0'], withdrawn: ['مسحوب', 'rx'] };
@@ -2103,6 +2108,201 @@ function fxCard() {
     '<div class="muted" style="font-size:12.5px">يُستخدم لحساب الزيادة بالعملتين، ويُحفظ مع كل طلب زيادة بالسعر الذي حُسب به. بدون سعر لا تُحال طلبات الزيادة.</div>' +
     (fx ? '<div>السعر الحالي: <b class="num">1 $ = ' + fmtN(fx.rate, 'IQD') + ' د.ع</b> <span class="muted num">(' + esc(fx.date) + ' · ' + esc(fx.by || '') + ')</span></div>' : '<div class="note warn">لم يُحدّد سعر الصرف بعد.</div>') +
     '<div class="grid"><label class="f">السعر الجديد (دينار لكل دولار)<input class="inp num" id="fx_v" type="number" min="1" step="0.0001" dir="ltr" value="' + (fx ? fx.rate : '') + '"></label><div class="actions" style="align-self:end"><button class="btn pri" id="fx_s">حفظ السعر</button></div></div></div></div>';
+}
+
+/* ================================================================ v4: org structure, print form for the department manager, signed-forms library, ERP link */
+(function () { var st = document.createElement('style'); st.textContent =
+  '.orgtop{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:6px 0 18px}.orgtop .oc{min-width:170px}' +
+  '.oc{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;display:flex;gap:8px;align-items:center;font-size:12.5px;line-height:1.35}.oc,.oc *{text-decoration:none!important;color:inherit}.oc b{color:var(--ink,inherit)}.oc>span>span{display:block;color:var(--muted,#6b6b6b)}' +
+  '.oc .av{width:30px;height:30px;border-radius:50%;flex:none;display:grid;place-items:center;font:700 11px var(--f-num,monospace);color:#fff;background:var(--accent)}' +
+  '.oc b{display:block;font-size:12.5px}.oc span{color:var(--muted);font-size:11.5px}.oc.lead{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}.oc.hit{outline:3px solid #f5b400}' +
+  '.orggrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}' +
+  '.odept{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}.odept>.oh{background:var(--brand,#231D2B);color:#fff;padding:10px 14px;display:flex;justify-content:space-between;gap:8px;align-items:center}' +
+  '.odept>.oh b{font-size:14px}.odept>.oh .n{font:700 12px var(--f-num,monospace);background:rgba(255,255,255,.15);border-radius:999px;padding:2px 9px}' +
+  '.ounit{padding:8px 12px;border-top:1px solid var(--line)}.ounit>.ut{font-size:12px;font-weight:700;color:var(--accent);margin-bottom:6px;display:flex;justify-content:space-between}' +
+  '.ounit .ppl{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px}.ounit .oc{padding:6px 8px}.ounit .oc .av{width:24px;height:24px;font-size:10px}' +
+  '.drop{border:2px dashed var(--line);border-radius:14px;padding:26px;text-align:center;cursor:pointer;background:var(--surface2)}.drop.on{border-color:var(--accent);background:var(--surface)}' +
+  '.qrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:12.5px}' +
+  '.formcode{display:flex;justify-content:space-between;align-items:center;gap:12px;border:2px solid #231D2B;border-radius:8px;padding:4px 12px;margin-top:6px}' +
+  '.formcode .code{font:700 16px/1 "IBM Plex Mono",monospace;letter-spacing:.5px;direction:ltr;white-space:nowrap}.sigblk{break-inside:avoid;page-break-inside:avoid}.paper .sig2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px}' +
+  '.paper .sig2>div{border:1px solid #bbb;border-radius:8px;padding:6px 12px;min-height:70px;display:flex;flex-direction:column;gap:3px}.paper .sig2 .ln{margin-top:auto;border-top:1px dotted #888;padding-top:4px;font-size:10px;color:#555}';
+  document.head.appendChild(st); })();
+
+/* ----- org structure: department of an employee is his placement on the chart when HR set one */
+function orgOf(e) { var p = profileOf(e[0]); return { dept: p.dept ? +p.dept : (JOB[e[2]] ? JOB[e[2]].dept : 0), unit: p.unit || '', title: p.title || '', mgr: p.mgr || '', lead: !!p.lead }; }
+function initials(n) { return String(n || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(function (w) { return w.charAt(0); }).join('').toUpperCase(); }
+function personChip(e, o, hit) { var j = JOB[e[2]] || {}; return '<a class="oc' + (o.lead ? ' lead' : '') + (hit ? ' hit' : '') + '" href="#/emp/' + encodeURIComponent(e[0]) + '"><span class="av">' + esc(initials(e[1])) + '</span><span style="min-width:0"><b>' + esc(e[1]) + '</b><span>' + esc(o.title || j.ar || '') + '</span></span></a>'; }
+var ORGQ = '';
+VIEWS.org = function (v) {
+  var emps = S.data.emps, depts = myDepts(), adm = isAdmin();
+  var by = {}; emps.forEach(function (e) { var o = orgOf(e); if (depts.indexOf(o.dept) < 0) return; var d = by[o.dept] = by[o.dept] || { units: {}, n: 0 }; var u = o.unit || deptName(o.dept); (d.units[u] = d.units[u] || []).push([e, o]); d.n++; });
+  var placed = emps.filter(function (e) { return profileOf(e[0]).dept; }).length;
+  var draw = function () {
+    var q = ORGQ.trim().toLowerCase(), hits = 0;
+    var top = emps.filter(function (e) { var o = orgOf(e); return o.lead && o.dept === 1; });
+    var cards = Object.keys(by).map(Number).sort(function (a, b) { return a - b; }).map(function (no) {
+      var d = by[no], dd = DEPT[no] || {}, units = Object.keys(d.units).sort(function (a, b) { var la = d.units[a].some(function (x) { return x[1].lead && !/—/.test(a); }); return la ? -1 : a < b ? -1 : 1; });
+      return '<section class="odept"><div class="oh"><span><b>' + esc(dd.ar || ('قسم ' + no)) + '</b><br><span style="font-size:11px;opacity:.75">' + esc(dd.en || '') + '</span></span><span class="n">' + d.n + '</span></div>' +
+        units.map(function (u) {
+          var l = d.units[u].sort(function (a, b) { return (b[1].lead - a[1].lead) || (a[0][1] < b[0][1] ? -1 : 1); });
+          return '<div class="ounit"><div class="ut"><span>' + esc(u) + '</span><span class="num muted">' + l.length + '</span></div><div class="ppl">' + l.map(function (x) { var h = q && (x[0][1] + ' ' + x[0][0] + ' ' + x[1].title).toLowerCase().indexOf(q) >= 0; if (h) hits++; return personChip(x[0], x[1], h); }).join('') + '</div></div>';
+        }).join('') + '</section>';
+    }).join('');
+    $('#orgb').innerHTML = (top.length ? '<div class="orgtop">' + top.sort(function (a, b) { return a[1] < b[1] ? -1 : 1; }).map(function (e) { return personChip(e, orgOf(e), false); }).join('') + '</div>' : '') + '<div class="orggrid">' + cards + '</div>';
+    $('#orgh').textContent = q ? hits + ' نتيجة' : '';
+    var f = $('.oc.hit'); if (f) f.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+  v.innerHTML = head('الهيكل التنظيمي', 'توزيع الموظفين على الأقسام والوحدات حسب الهيكل المعتمد — اضغط أي اسم لفتح بطاقته', '', (adm ? '<button class="btn sec" id="orgr">' + ic('check') + 'تقرير المطابقة</button>' : '') + '<button class="btn sec" id="orgp">' + ic('print') + 'طباعة</button>') +
+    '<div class="kpis" style="margin-bottom:12px">' + kpiTile(emps.length, 'موظف', true) + kpiTile(Object.keys(by).length, 'قسم') + kpiTile(Object.keys(by).reduce(function (t, k) { return t + Object.keys(by[k].units).length; }, 0), 'وحدة / فريق') + (adm ? kpiTile(placed + '<span class="muted" style="font-size:14px"> / ' + emps.length + '</span>', 'موزّع حسب الهيكل') : '') + '</div>' +
+    '<div class="card" style="margin-bottom:12px"><div class="bd grid"><label class="f">بحث بالاسم أو الرقم أو المنصب<input class="inp" id="orgq" type="search" value="' + esc(ORGQ) + '"></label><div class="muted" id="orgh" style="align-self:end"></div></div></div><div id="orgb"></div>';
+  $('#orgq').oninput = function () { ORGQ = this.value; draw(); };
+  $('#orgp').onclick = function () { var b = $('#orgb').cloneNode(true); printPapers(['<div class="paper">' + letterhead('الهيكل التنظيمي', 'ORGANIZATION STRUCTURE', nowBaghdad().slice(0, 10)) + b.innerHTML + paperFoot() + '</div>']); };
+  var rb = $('#orgr'); if (rb) rb.onclick = orgReportModal;
+  draw();
+};
+function orgReportModal() {
+  api('orgReport').then(function (res) {
+    var R = res.report;
+    if (!R) { modal('<div class="mbox narrow"><div class="card"><div class="bd stack"><div class="empty">لم يُطبَّق الهيكل التنظيمي بعد.</div><button class="btn sec" data-close>إغلاق</button></div></div></div>'); return; }
+    var free = S.data.emps.filter(function (e) { return !profileOf(e[0]).dept; });
+    var empOpts = '<option value="">— اختر الموظف —</option>' + free.map(function (e) { return '<option value="' + esc(e[0]) + '">' + esc(e[1]) + ' · ' + esc(e[0]) + '</option>'; }).join('');
+    var deptOpts = S.data.depts.map(function (d) { return '<option value="' + d.no + '">' + esc(d.ar) + '</option>'; }).join('');
+    var miss = (R.unmatched || []).concat(R.ambiguous || []);
+    modal('<div class="mbox"><div class="mtool"><b>تقرير مطابقة الهيكل التنظيمي</b><span class="muted num" style="font-size:12px">' + esc(sigDate(R.at)) + '</span><span class="grow"></span><button class="btn sec sm" data-close>إغلاق ✕</button></div>' +
+      '<div class="kpis" style="margin-bottom:12px">' + kpiTile((R.matched || []).length, 'طوبقوا ووُزّعوا', true) + kpiTile(miss.length, 'في الهيكل ولم يُعثر عليهم') + kpiTile((R.notInChart || []).length, 'موظفون غير موجودين في الهيكل') + '</div>' +
+      '<div class="cols2"><div class="card"><div class="hd"><h2>أسماء الهيكل غير المطابَقة</h2></div><div class="bd">' + (miss.length ? miss.map(function (x, i) { return '<div class="qrow"><div><b>' + esc(x.n) + '</b><div class="muted">' + esc(x.t || '') + ' · ' + esc(deptName(x.d)) + ' · ' + esc(x.u) + (x.ids ? ' · <span class="pill r1">أكثر من موظف بالاسم نفسه</span>' : '') + '</div></div><div class="actions"><select class="inp" data-mi="' + i + '" style="width:200px">' + empOpts + '</select><button class="btn pri sm" data-ms="' + i + '">ربط</button></div></div>'; }).join('') : '<div class="empty">كل أسماء الهيكل طوبقت</div>') + '</div></div>' +
+      '<div class="card"><div class="hd"><h2>موظفون لم يرد اسمهم في الهيكل</h2></div><div class="bd">' + ((R.notInChart || []).filter(function (x) { return EMP[x.id] && !profileOf(x.id).dept; }).map(function (x) { return '<div class="qrow"><div><b>' + esc(x.name) + '</b> <span class="num muted">' + esc(x.id) + '</span></div><div class="actions"><select class="inp" data-nd="' + esc(x.id) + '" style="width:160px">' + deptOpts + '</select><input class="inp" data-nu="' + esc(x.id) + '" placeholder="الوحدة / الفريق" style="width:140px"><button class="btn pri sm" data-ns="' + esc(x.id) + '">توزيع</button></div></div>'; }).join('') || '<div class="empty">لا يوجد</div>') + '</div></div></div></div>');
+    var m = $('#modal');
+    m.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-ms]'), c = e.target.closest('[data-ns]');
+      if (b) { var x = miss[+b.dataset.ms], id = $('[data-mi="' + b.dataset.ms + '"]').value; if (!id) return toast('اختر الموظف'); api('orgResolve', { chartName: x.n, empId: id }).then(function () { return reloadData(); }).then(function () { toast('رُبط ' + x.n); orgReportModal(); }).catch(function (er) { toast(er.message); }); }
+      if (c) { var eid = c.dataset.ns; api('setOrg', { empId: eid, dept: $('[data-nd="' + eid + '"]').value, unit: $('[data-nu="' + eid + '"]').value }).then(function () { return reloadData(); }).then(function () { toast('وُزّع الموظف'); orgReportModal(); }).catch(function (er) { toast(er.message); }); }
+    });
+  }).catch(function (e) { toast(e.message); });
+}
+
+/* ----- the printed form: signed on paper by the employee and his department manager only */
+var PAPER_PRINT = false;
+function deptManagerOf(r) {
+  var w = r.wf || {};
+  if (w.head && w.head.email && !w.head.skipped) return [w.head.name, w.head.title || 'مدير القسم'];
+  if (w.head && w.head.skipped === 'self') return [r.ev.name, r.ev.title];
+  var d = DEPT[r.emp.dept] || {}, h = splitHead(d.head_ar || d.head);
+  return h[0] ? [h[0], h[1] || 'مدير القسم'] : [r.ev.name, r.ev.title];
+}
+function formCode(r) { return 'HR-EVAL-' + r.id; }
+function printSigs(r) {
+  var m = deptManagerOf(r);
+  return '<div class="sigblk"><div class="band"><span>التواقيع</span><span class="en">SIGNATURES</span></div><div class="sig2">' +
+    '<div><b>مدير القسم <span class="en">Department Manager</span></b><span>' + esc(m[0] || '') + '</span><span class="en">' + esc(m[1] || '') + '</span><span class="ln">التوقيع والتاريخ · Signature &amp; date</span></div>' +
+    '<div><b>الموظف — اطّلعت على التقييم <span class="en">Employee — acknowledged</span></b><span>' + esc(r.emp.name) + '</span><span class="en num">' + esc(r.emp.id) + '</span><span class="ln">التوقيع والتاريخ · Signature &amp; date</span></div></div>' +
+    '<div class="formcode"><span style="font-size:10.5px">بعد التوقيع تُرفع هذه الاستمارة في «مكتبة الاستمارات الموقّعة» وتُوزَّع تلقائياً على ملف الموظف بهذا الرمز.<br><span class="en">Upload the signed form to the Signed Forms Library — it is filed automatically by this code.</span></span><span class="code">' + esc(formCode(r)) + ' · ' + esc(r.emp.id) + '</span></div></div>';
+}
+function printEval(rec) { PAPER_PRINT = true; try { return evalPaper(rec); } finally { PAPER_PRINT = false; } }
+
+/* ----- signed forms library: upload, file automatically under each employee */
+var OCR = { lib: 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js', pdf: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js', worker: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js' };
+function normId(s) { return String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+/* who is this file? the form code, then the employee number, then the name — in the file name or in the scanned text */
+function matchText(txt) {
+  var T = String(txt || ''), U = T.toUpperCase(), all = (S.inbox || []).concat(S.evals || []);
+  var m = U.match(/HR[\s\-_]*EVAL[\s\-_]*([0-9A-F]{10})/) || U.match(/\b([0-9A-F]{10})\b/);
+  if (m) { var ev = all.filter(function (x) { return x.id === m[1]; })[0]; if (ev) return { empId: ev.emp.id, evalId: ev.id, why: 'رمز الاستمارة ' + ev.id }; }
+  var nu = normId(U), ids = Object.keys(EMP).sort(function (a, b) { return b.length - a.length; });
+  for (var i = 0; i < ids.length; i++) { var k = normId(ids[i]); if (k.length >= 4 && nu.indexOf(k) >= 0) return { empId: ids[i], why: 'الرقم الوظيفي ' + ids[i] }; }
+  var low = T.toLowerCase().replace(/[_\-.]+/g, ' ');
+  var byName = S.data.emps.filter(function (e) { return e[1].length > 6 && low.indexOf(e[1].toLowerCase()) >= 0; });
+  if (byName.length === 1) return { empId: byName[0][0], why: 'الاسم' };
+  return null;
+}
+function latestEval(empId) { var all = (S.inbox || []).concat(S.evals || []).filter(function (x) { return x.emp.id === empId && x.wf && x.wf.stage !== 'cancelled'; }); all.sort(function (a, b) { return a.updated < b.updated ? 1 : -1; }); return all[0] || null; }
+function fileData(f) { return new Promise(function (res, rej) { var r = new FileReader(); r.onload = function () { res(r.result); }; r.onerror = rej; r.readAsDataURL(f); }); }
+function shrinkImage(f) { return resizeImage(f, 1800, 'image/jpeg', .82); }
+function ocrFile(f) {
+  /* the scanned page is read in the browser; nothing leaves it except the final file */
+  return loadScript(OCR.lib).then(function () {
+    if (f.type === 'application/pdf') return loadScript(OCR.pdf).then(function () {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = OCR.worker;
+      return f.arrayBuffer().then(function (b) { return window.pdfjsLib.getDocument({ data: b }).promise; }).then(function (pdf) { return pdf.getPage(1); }).then(function (pg) {
+        var vp = pg.getViewport({ scale: 2 }), c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height; return pg.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise.then(function () { return c; });
+      });
+    });
+    return f;
+  }).then(function (src) { return window.Tesseract.recognize(src, 'eng'); }).then(function (r) { return r.data.text || ''; });
+}
+VIEWS.signed = function (v) {
+  if (!isAdmin()) { location.hash = '#/home'; return; }
+  var Q = [], list = [], q = '';
+  v.innerHTML = head('مكتبة الاستمارات الموقّعة', 'ارفع الاستمارات بعد توقيع الموظف ومدير القسم — يقرأ النظام رمز الاستمارة أو الرقم الوظيفي ويحفظ كل ملف في ملف صاحبه', '', '<button class="btn sec" id="sgr">' + ic('refresh') + 'تحديث</button>') +
+    '<div class="drop" id="sdz"><div style="font-size:15px;font-weight:700">' + ic('up').replace('<svg', '<svg width="22" height="22"') + ' اسحب الملفات هنا أو اضغط للاختيار</div><div class="muted" style="font-size:12.5px;margin-top:6px">PDF أو صور (ماسح ضوئي أو كاميرا الهاتف) · ملفات كثيرة دفعة واحدة · يُفضَّل أن يتضمن اسم الملف الرقم الوظيفي، وإلا يقرأ النظام رمز الاستمارة من الصفحة</div><input type="file" id="sfi" multiple accept="application/pdf,image/*" hidden></div>' +
+    '<div id="sq" style="margin-top:12px"></div><div class="card" style="margin-top:14px"><div class="hd"><h2>الاستمارات المحفوظة</h2><input class="inp" id="sgq" type="search" placeholder="بحث بالاسم أو الرقم" style="max-width:260px"></div><div class="bd" id="sgl"><div class="loading" style="min-height:14vh"><div class="spin"></div></div></div></div>';
+  var empOpts = function (sel) { return '<option value="">— اختر الموظف —</option>' + S.data.emps.slice().sort(function (a, b) { return a[1] < b[1] ? -1 : 1; }).map(function (e) { return '<option value="' + esc(e[0]) + '"' + (e[0] === sel ? ' selected' : '') + '>' + esc(e[1]) + ' · ' + esc(e[0]) + '</option>'; }).join(''); };
+  var drawQ = function () {
+    $('#sq').innerHTML = Q.length ? '<div class="card"><div class="hd"><h2>الرفع الحالي (' + Q.filter(function (x) { return x.st === 'done'; }).length + '/' + Q.length + ')</h2></div><div class="bd">' + Q.map(function (x, i) {
+      var st = { wait: '<span class="pill rx">بالانتظار</span>', read: '<span class="pill r1">يقرأ الصفحة…</span>', up: '<span class="pill r1">يرفع…</span>', done: '<span class="pill r3">حُفظ في ملف ' + esc(x.empName || '') + '</span>', need: '<span class="pill r0">حدّد الموظف</span>', fail: '<span class="pill r0">' + esc(x.err || 'تعذّر') + '</span>' }[x.st];
+      return '<div class="qrow"><div><b>' + esc(x.f.name) + '</b> ' + st + (x.why ? ' <span class="muted">— تعرّف بـ' + esc(x.why) + '</span>' : '') + '</div>' + (x.st === 'need' ? '<div class="actions"><select class="inp" data-qe="' + i + '" style="width:230px">' + empOpts(x.empId) + '</select><button class="btn pri sm" data-qs="' + i + '">حفظ</button></div>' : '<span></span>') + '</div>';
+    }).join('') + '</div></div>' : '';
+  };
+  var upload = function (x, how) {
+    x.st = 'up'; drawQ();
+    var ev = x.evalId ? null : latestEval(x.empId);
+    return (x.f.type === 'application/pdf' ? fileData(x.f) : shrinkImage(x.f)).then(function (d) { return api('signedUpload', { file: { name: x.f.name, data: d, empId: x.empId, evalId: x.evalId || (ev && ev.id) || '', how: how } }); })
+      .then(function (r) { x.st = 'done'; x.empName = r.item.empName; drawQ(); load(); }).catch(function (e) { x.st = 'fail'; x.err = e.message; drawQ(); });
+  };
+  var run = function () {
+    var next = Q.filter(function (x) { return x.st === 'wait'; })[0]; if (!next) return;
+    var hit = matchText(next.f.name);
+    var go = hit ? Promise.resolve([hit, 'filename']) : (next.st = 'read', drawQ(), ocrFile(next.f).then(function (t) { var h = matchText(t); return [h, 'ocr']; }).catch(function () { return [null, '']; }));
+    go.then(function (r) { if (r[0]) { next.empId = r[0].empId; next.evalId = r[0].evalId || ''; next.why = r[0].why + (r[1] === 'ocr' ? ' (من الصفحة)' : ' (من اسم الملف)'); return upload(next, r[1]); } next.st = 'need'; drawQ(); }).then(run);
+  };
+  var add = function (files) { Array.prototype.forEach.call(files, function (f) { if (f.size > 12 * 1024 * 1024) { Q.push({ f: f, st: 'fail', err: 'أكبر من 12MB' }); return; } Q.push({ f: f, st: 'wait' }); }); drawQ(); run(); };
+  var dz = $('#sdz'); dz.onclick = function () { $('#sfi').click(); }; $('#sfi').onchange = function () { add(this.files); this.value = ''; };
+  dz.ondragover = function (e) { e.preventDefault(); dz.classList.add('on'); }; dz.ondragleave = function () { dz.classList.remove('on'); };
+  dz.ondrop = function (e) { e.preventDefault(); dz.classList.remove('on'); add(e.dataTransfer.files); };
+  $('#sq').onclick = function (e) { var b = e.target.closest('[data-qs]'); if (!b) return; var x = Q[+b.dataset.qs], id = $('[data-qe="' + b.dataset.qs + '"]').value; if (!id) return toast('اختر الموظف'); x.empId = id; x.why = 'اختيار يدوي'; upload(x, 'manual'); };
+  var drawL = function () {
+    var l = list.filter(function (x) { return !q || (x.empName + ' ' + x.empId + ' ' + x.file).toLowerCase().indexOf(q) >= 0; });
+    $('#sgl').innerHTML = l.length ? '<div class="tw"><table class="t minw"><thead><tr><th>الموظف</th><th>الاستمارة</th><th>الملف</th><th>طريقة التوزيع</th><th>رُفع</th><th></th></tr></thead><tbody>' + l.map(function (x) {
+      return '<tr><td>' + (x.empId ? '<a href="#/emp/' + encodeURIComponent(x.empId) + '"><b>' + esc(x.empName) + '</b></a><div class="num muted" style="font-size:11px">' + esc(x.empId) + '</div>' : '<span class="pill r0">غير موزّع</span>') + '</td><td>' + (x.evalId ? (TYPE[x.type] ? TYPE[x.type][1] : '') + ' <span class="num">' + esc(x.period) + '</span>' : '<span class="muted">—</span>') + '</td><td style="font-size:12px">' + esc(x.file) + '<div class="muted num">' + Math.round(x.size / 1024) + ' KB</div></td><td>' + ({ filename: 'اسم الملف', ocr: 'قراءة الصفحة', manual: 'يدوي' }[x.how] || '—') + '</td><td class="num" style="font-size:12px">' + esc(sigDate(x.at)) + '<div class="muted">' + esc(x.by) + '</div></td><td class="w"><div class="actions"><button class="btn sec sm" data-so="' + esc(x.id) + '">عرض</button><button class="btn sec sm" data-sa="' + esc(x.id) + '">نقل</button><button class="btn danger sm" data-sd="' + esc(x.id) + '">حذف</button></div></td></tr>';
+    }).join('') + '</tbody></table></div>' : '<div class="empty">لا توجد ملفات</div>';
+  };
+  var load = function () { return api('signedList').then(function (r) { list = r.items; drawL(); }).catch(function (e) { $('#sgl').innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; }); };
+  $('#sgq').oninput = function () { q = this.value.trim().toLowerCase(); drawL(); };
+  $('#sgr').onclick = load;
+  $('#sgl').onclick = function (e) {
+    var o = e.target.closest('[data-so]'), a = e.target.closest('[data-sa]'), d = e.target.closest('[data-sd]');
+    if (o) openSigned(o.dataset.so);
+    if (a) { modal('<div class="mbox narrow"><div class="card"><div class="hd"><h2>نقل الملف إلى موظف آخر</h2></div><div class="bd stack"><select class="inp" id="sae">' + empOpts('') + '</select><div class="actions"><button class="btn pri" id="sas">نقل</button><button class="btn sec" data-close>إلغاء</button></div></div></div></div>');
+      $('#sas').onclick = function () { var id = $('#sae').value; if (!id) return; var ev = latestEval(id); api('signedAssign', { id: a.dataset.sa, empId: id, evalId: ev ? ev.id : '' }).then(function () { closeModal(); toast('نُقل'); load(); }).catch(function (er) { toast(er.message); }); }; }
+    if (d) reasonModal('حذف الملف', 'يُحذف الملف من المكتبة ومن ملف الموظف.', 'السبب (إلزامي)', 'حذف', true).then(function (t) { if (t) api('signedDelete', { id: d.dataset.sd, reason: t }).then(function () { toast('حُذف'); load(); }).catch(function (er) { toast(er.message); }); });
+  };
+  load();
+};
+function openSigned(id) {
+  api('signedGet', { id: id }).then(function (r) {
+    var it = r.item, view = /^data:application\/pdf/.test(r.data) ? '<iframe src="' + r.data + '" style="width:100%;height:75vh;border:0;border-radius:8px;background:#fff"></iframe>' : '<img src="' + r.data + '" alt="" style="max-width:100%;border-radius:8px">';
+    modal('<div class="mbox"><div class="mtool"><b>' + esc(it.empName || 'غير موزّع') + '</b><span class="muted num">' + esc(it.empId) + '</span><span class="grow"></span><a class="btn sec sm" download="' + esc(it.file || (it.id + '.pdf')) + '" href="' + r.data + '">' + ic('dl') + 'تنزيل</a><button class="btn sec sm" data-close>إغلاق ✕</button></div>' + view + '</div>');
+  }).catch(function (e) { toast(e.message); });
+}
+function signedForEmp(id, box) {
+  if (!isAdmin() || !box) return;
+  api('signedList').then(function (r) { var l = r.items.filter(function (x) { return x.empId === id; });
+    box.innerHTML = l.length ? l.map(function (x) { return '<div class="qrow"><div><b>' + (x.evalId ? (TYPE[x.type] ? TYPE[x.type][1] : '') + ' ' + esc(x.period) : esc(x.file)) + '</b> <span class="muted num">' + esc(sigDate(x.at)) + '</span></div><button class="btn sec sm" data-so="' + esc(x.id) + '">عرض</button></div>'; }).join('') : '<div class="muted">لا توجد استمارات موقّعة مرفوعة لهذا الموظف بعد.</div>';
+    box.onclick = function (e) { var b = e.target.closest('[data-so]'); if (b) openSigned(b.dataset.so); };
+  }).catch(function () {});
+}
+
+/* ----- ERP link: the ERP pulls job descriptions, KPIs, structure and approved results directly */
+function erpLinkCard() {
+  return '<div class="card" id="erpl"><div class="hd"><h2>الربط المباشر مع نظام الـ ERP</h2><span class="en">Direct ERP link</span></div><div class="bd stack">' +
+    '<div class="muted" style="font-size:12.5px">يسحب الـ ERP مباشرة الأوصاف الوظيفية ومؤشرات الأداء والأقسام وتوزيع الموظفين على الهيكل ونتائج التقييمات المعتمدة نهائياً، بمفتاح يصدره مالك النظام. الربط للقراءة فقط، وكل سحب يُسجَّل في سجل الحركات.</div>' +
+    '<div id="erpst" class="muted">…</div><label class="f">عنوان الربط <span class="en">Endpoint</span><input class="inp" dir="ltr" readonly value="' + esc(API) + '"></label>' +
+    '<div class="actions"><button class="btn pri" id="erpk">إصدار مفتاح ربط جديد</button></div><div id="erpkv"></div></div></div>';
+}
+function erpLinkBind() {
+  var st = function (r) { $('#erpst').innerHTML = r.active ? '<span class="pill r3">الربط مفعّل</span> صدر المفتاح: <span class="num">' + esc(sigDate(r.issued)) + '</span>' + (r.last ? ' · آخر سحب من الـ ERP: <span class="num">' + esc(sigDate(r.last)) + '</span>' : ' · لم يسحب الـ ERP بعد') : '<span class="pill r1">لا يوجد مفتاح ربط</span>'; };
+  api('erpKey', {}).then(st).catch(function (e) { $('#erpst').textContent = e.message; });
+  $('#erpk').onclick = function () { var b = this; twoClick(b, 'تأكيد: المفتاح القديم يتوقف', function () { api('erpKey', { regenerate: true }).then(function (r) { st(r); $('#erpkv').innerHTML = '<div class="note warn"><div>انسخ المفتاح الآن وضعه في الـ ERP («الأداء ← الربط مع بوابة التقييم»). لن يظهر مرة أخرى.<div class="codebox" style="font-size:14px;direction:ltr;word-break:break-all">' + esc(r.key) + '</div></div></div>'; }).catch(function (e) { toast(e.message); }); }); };
 }
 
 boot();
