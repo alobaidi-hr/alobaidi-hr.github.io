@@ -59,7 +59,7 @@ function runMigrations(B, ed) {
     for (const o of m.ops) {
       if (o.op === 'addJob' && !jobOf(o.job.code)) putJob(cleanJob(o.job));
       else if (o.op === 'jobReportsTo') for (const c of o.codes) { const j = jobOf(c); if (j) putJob({ ...j, b: { ...j.b, ov: { ...j.b.ov, 'Reports To': o.value } } }); }
-      else if (o.op === 'orgChart') { const r = applyOrgChart(cur(), ed, decryptOrg(o.enc), m.by); ed = r.ed; ed.orgReport = { ...r.report, id: m.id, at: now() }; }
+      else if (o.op === 'orgChart') { const prev = ed.orgReport || {}, r = applyOrgChart(cur(), ed, decryptOrg(o.enc), m.by); ed = r.ed; ed.orgReport = { ...r.report, manual: prev.manual || [], id: m.id, at: now() }; }
       else if (o.op === 'jobPatch') { const j = jobOf(o.code); if (j) putJob(cleanJob({ ...j, b: { ...j.b, ...o.b, ov: { ...j.b.ov, ...(o.b.ov || {}) } } })); }
       else if (o.op === 'jobText') { const j = jobOf(o.code); if (j) putJob({ ...j, b: { ...j.b, duties: j.b.duties.map((p) => p.map((t) => String(t).split(o.from).join(o.to))) } }); }
       else if (o.op === 'moveEmp') {
@@ -100,27 +100,63 @@ function nameScore(a, b) {
   let k = 0; while (k < sh.length && a[k] === b[k]) k++;                /* same first three names, different tail */
   return k >= 3 ? 80 : 0;
 }
+/* second pass: spellings of the same Arabic name in Latin letters (Galoob/Chaloob, Isaa/Esaa, Ameer/Amir) */
+function soundKey(w) {
+  w = String(w || '').toLowerCase().replace(/^al(?=[a-z]{3,})/, '');
+  w = w.replace(/ph/g, 'f').replace(/kh/g, 'x').replace(/gh/g, 'g').replace(/sh/g, '$').replace(/ch/g, 'g').replace(/dh|th|z/g, 'z').replace(/[qkjc]/g, 'g').replace(/v/g, 'f').replace(/w/g, 'u');
+  w = w.replace(/h$/, '').replace(/[aeiouy]/g, '').replace(/(.)\1+/g, '$1');
+  return w;
+}
+function lev1(a, b) { if (a === b) return true; if (Math.abs(a.length - b.length) > 1) return false; let i = 0, j = 0, d = 0;
+  while (i < a.length && j < b.length) { if (a[i] === b[j]) { i++; j++; continue; } if (++d > 1) return false; if (a.length > b.length) i++; else if (b.length > a.length) j++; else { i++; j++; } }
+  return d + (a.length - i) + (b.length - j) <= 1; }
+/* names that sound alike in Latin letters but are different names */
+const DISTINCT = new Set(['mohammed', 'mahmoud', 'ahmed', 'hamid', 'hamad', 'hammoud', 'amer', 'amir', 'omar', 'emad', 'imad', 'hadi', 'hady', 'saad', 'saud', 'said', 'sayed', 'ali', 'alaa', 'adel', 'adil', 'khalid', 'khalil', 'karim', 'kareem', 'nadhim', 'nazim', 'hasan', 'hussain', 'hassanein', 'mohanad', 'musa', 'nouri']);
+const SAME = { muhaned: 'mohanad', mohaned: 'mohanad', muhanad: 'mohanad', muhannad: 'mohanad', mohannad: 'mohanad', ameer: 'amir', emad: 'imad', adil: 'adel', kareem: 'karim', hady: 'hadi', nazim: 'nadhim', sayed: 'said' };
+const soundEq = (x, y) => { const cx = SAME[x] || x, cy = SAME[y] || y; if (cx === cy) return true; if (DISTINCT.has(cx) && DISTINCT.has(cy)) return false;
+  const a = soundKey(x), b = soundKey(y); return a === b || (Math.min(a.length, b.length) >= 3 && lev1(a, b)); };
+function soundMatch(ka, kb) { /* first two names agree by sound */
+  if (ka.length < 2 || kb.length < 2) return false;
+  if (!(soundEq(ka[0], kb[0]) && soundEq(ka[1], kb[1]))) return false;
+  if (ka.length >= 3 && kb.length >= 3) return ka.slice(2).some((x) => kb.slice(2).some((y) => soundEq(x, y))); /* both give a third name: one of them must agree too */
+  return true;
+}
 /* place each person of the chart on the matching employee; unclear names are reported, never guessed */
 function applyOrgChart(D, ed, people, by) {
   ed = { ...ed, emps: { ...(ed.emps || {}) }, profiles: { ...(ed.profiles || {}) } };
-  const emps = D.emps.map((e) => ({ e, k: nameKey(e[1]) })), used = new Set(), report = { matched: [], unmatched: [], ambiguous: [], notInChart: [] };
+  const emps = D.emps.map((e) => ({ e, k: nameKey(e[1]) })), used = new Set(), report = { matched: [], unmatched: [], ambiguous: [], notInChart: [] }, left = [];
+  /* placements HR made by hand are kept: those employees are not offered to the chart again */
+  for (const x of emps) { const pf = ed.profiles[x.e[0]]; if (pf && pf.org === 'manual') used.add(x.e[0]); }
+  const place = (p, e, s) => {
+    used.add(e[0]);
+    const pf = { ...(ed.profiles[e[0]] || {}) }, from = empDeptOf(D, e, pf);
+    Object.assign(pf, { dept: p.d, unit: p.u, unit_en: p.ue, title: p.t, mgr: p.m, lead: !!p.l, org: 'chart' });
+    if (from !== p.d) pf.history = [...(pf.history || []), { d: now(), t: 'org', fd: from, td: p.d, unit: p.u, by }].slice(-50);
+    ed.profiles[e[0]] = pf;
+    if (p.m) { const mp = people.find((x) => x.n === p.m); ed.emps[e[0]] = [e[0], e[1], e[2], e[3], e[4], p.m + (mp ? ' — ' + mp.t : ''), p.m + (mp ? ' — ' + mp.t : '')]; }
+    report.matched.push({ n: p.n, id: e[0], name: e[1], d: p.d, u: p.u, s });
+  };
   const city = (e) => String((e[3] || '') + ' ' + (e[4] || '')).toLowerCase();
   const CITY = { Baghdad: /baghdad|\u0628\u063a\u062f\u0627\u062f|hq/, Erbil: /erbil|\u0623\u0631\u0628\u064a\u0644|\u0627\u0631\u0628\u064a\u0644/, Mosul: /mosul|\u0645\u0648\u0635\u0644/ };
   for (const p of people) {
     const k = nameKey(p.n); let c = emps.map((x) => ({ ...x, s: nameScore(k, x.k) })).filter((x) => x.s > 0 && !used.has(x.e[0]));
     const best = Math.max(0, ...c.map((x) => x.s)); c = c.filter((x) => x.s === best);
     if (c.length > 1 && p.c && CITY[p.c]) { const cc = c.filter((x) => CITY[p.c].test(city(x.e))); if (cc.length) c = cc; }
-    if (!c.length) { report.unmatched.push({ n: p.n, t: p.t, d: p.d, u: p.u }); continue; }
+    if (!c.length) { left.push(p); continue; }
     if (c.length > 1) { report.ambiguous.push({ n: p.n, t: p.t, d: p.d, u: p.u, ids: c.map((x) => x.e[0]) }); continue; }
-    const e = c[0].e; used.add(e[0]);
-    const pf = { ...(ed.profiles[e[0]] || {}) }, from = empDeptOf(D, e, pf);
-    Object.assign(pf, { dept: p.d, unit: p.u, unit_en: p.ue, title: p.t, mgr: p.m, lead: !!p.l, org: 'chart' });
-    if (from !== p.d) pf.history = [...(pf.history || []), { d: now(), t: 'org', fd: from, td: p.d, unit: p.u, by }].slice(-50);
-    ed.profiles[e[0]] = pf;
-    if (p.m) { const mp = people.find((x) => x.n === p.m); ed.emps[e[0]] = [e[0], e[1], e[2], e[3], e[4], p.m + (mp ? ' — ' + mp.t : ''), p.m + (mp ? ' — ' + mp.t : '')]; }
-    report.matched.push({ n: p.n, id: e[0], name: e[1], d: p.d, u: p.u, s: best });
+    place(p, c[0].e, best);
+  }
+  /* second pass by sound: a match only when it is the one employee for that person AND the one person for that employee */
+  const cand = left.map((p) => { const k = nameKey(p.n); let c = emps.filter((x) => !used.has(x.e[0]) && soundMatch(k, x.k));
+    if (c.length > 1 && p.c && CITY[p.c]) { const cc = c.filter((x) => CITY[p.c].test(city(x.e))); if (cc.length) c = cc; } return { p, c }; });
+  for (const { p, c } of cand) {
+    if (c.length === 1 && cand.filter((o) => o.c.some((x) => x.e[0] === c[0].e[0])).length === 1 && !used.has(c[0].e[0])) { place(p, c[0].e, 70); continue; }
+    if (c.length > 1) report.ambiguous.push({ n: p.n, t: p.t, d: p.d, u: p.u, ids: c.map((x) => x.e[0]) });
+    else if (c.length === 1) report.ambiguous.push({ n: p.n, t: p.t, d: p.d, u: p.u, ids: [c[0].e[0]] });
+    else report.unmatched.push({ n: p.n, t: p.t, d: p.d, u: p.u });
   }
   for (const x of emps) if (!used.has(x.e[0])) report.notInChart.push({ id: x.e[0], name: x.e[1] });
+  report.notInChart = report.notInChart.filter((x) => !(ed.profiles[x.id] && ed.profiles[x.id].org === 'manual'));
   return { ed, report };
 }
 const empDeptOf = (D, e, pf) => (pf && pf.dept ? Number(pf.dept) : ((D.jobs.find((j) => j.code === e[2]) || {}).dept || 0));
