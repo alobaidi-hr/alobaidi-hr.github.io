@@ -282,6 +282,15 @@ async function renameStored(id, from, to) {
   if (tc) await setJSON('trash', tr);
   return out;
 }
+function nextEmpId() {
+  /* the next employee number: one above the highest numeric ID, same width */
+  const nums = SEED.emps.map((x) => x[0]).filter((x) => /^\d+$/.test(x));
+  if (!nums.length) return '10001';
+  const max = nums.reduce((a, b) => (BigInt(b) > BigInt(a) ? b : a));
+  let n = (BigInt(max) + 1n).toString(); while (n.length < max.length) n = '0' + n;
+  while (SEED.emps.some((x) => x[0] === n)) n = (BigInt(n) + 1n).toString();
+  return n;
+}
 async function evals() { await migrateV3(); return getJSON('evals', {}); }
 /* incoming box for managers / GM / CEO: evaluations and self-assessments that reach them */
 async function boxItems(email, u) {
@@ -678,14 +687,21 @@ const R = {
   async saveEmp({ token, emp, isNew }) {
     await loadData(); const s = (v, n = 120) => String(v == null ? '' : v).trim().slice(0, n); emp = emp || {};
     const e = [s(emp.id, 30), s(emp.name), s(emp.code, 20), s(emp.br_en), s(emp.br_ar), s(emp.rep), s(emp.rep_ar)];
-    if (!e[0] || !e[1]) err('invalid', 'اكتب الرقم الوظيفي والاسم');
+    if (isNew && !e[0]) e[0] = nextEmpId();
+    if (!e[0] || !e[1]) err('invalid', 'اكتب الاسم');
+    const wantDept = emp.dept != null && emp.dept !== '' ? Number(emp.dept) : null;
+    if (wantDept !== null && !SEED.depts.some((d) => d.no === wantDept)) err('invalid', 'القسم غير موجود');
+    const mgrE = emp.mgrId ? SEED.emps.find((x) => x[0] === String(emp.mgrId)) : null; if (emp.mgrId && !mgrE) err('invalid', 'المدير المباشر غير موجود');
+    if (mgrE && mgrE[0] === e[0]) err('invalid', 'لا يكون الموظف مديراً لنفسه');
     if (!JOBS[e[2]]) err('invalid', 'اختر الوظيفة');
     const old = SEED.emps.find((x) => x[0] === e[0]);
     if (isNew && old) err('exists', 'يوجد موظف بنفس الرقم الوظيفي'); if (!isNew && !old) err('not_found', 'الموظف غير موجود');
-    const me = await editor(token, 'emp', [JOBS[e[2]].dept, old && empDept(old)]);
+    const me = await editor(token, 'emp', [wantDept !== null ? wantDept : JOBS[e[2]].dept, old && empDept(old)]);
     const ed = await getJSON('edits', {}); ed.emps = ed.emps || {}; ed.profiles = ed.profiles || {}; ed.emps[e[0]] = e;
     const pf = { ...(ed.profiles[e[0]] || {}) }, f = emp.profile || {};
     for (const k of PROFILE_KEYS) if (f[k] !== undefined) pf[k] = s(f[k], k === 'notes' ? 1500 : 200);
+    if (wantDept !== null) { if (wantDept !== JOBS[e[2]].dept) pf.dept = wantDept; else if (pf.org !== 'chart') delete pf.dept; }
+    if (emp.mgrId !== undefined) { if (mgrE) { pf.mgrId = mgrE[0]; pf.mgr = mgrE[1]; } else { delete pf.mgrId; } }
     pf.history = pf.history || [];
     if (isNew) pf.history.push({ d: now(), t: 'hire', to: e[2], by: me.email });
     else if (old[2] !== e[2]) pf.history.push({ d: now(), t: 'move', from: old[2], to: e[2], fd: empDept(old), td: JOBS[e[2]].dept, by: me.email });

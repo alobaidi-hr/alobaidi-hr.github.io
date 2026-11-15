@@ -1230,28 +1230,77 @@ function jdEditor(code) {
 /* ----- employee editor + profile card */
 var PF = [['phone', 'الهاتف', 'Phone', 'tel'], ['email', 'البريد الإلكتروني', 'E-mail', 'email'], ['hire', 'تاريخ التعيين', 'Hire date', 'date'], ['birth', 'تاريخ الميلاد', 'Date of birth', 'date'],
   ['grade', 'الدرجة الوظيفية', 'Grade', 'text'], ['contract', 'نوع العقد', 'Contract', 'text'], ['nat', 'الجنسية', 'Nationality', 'text'], ['address', 'العنوان', 'Address', 'text']];
+function nextEmpIdLocal() {
+  var nums = S.data.emps.map(function (x) { return x[0]; }).filter(function (x) { return /^\d+$/.test(x); });
+  if (!nums.length) return '10001';
+  var max = nums.reduce(function (a, b) { return (b.length > a.length || (b.length === a.length && b > a)) ? b : a; });
+  var n = String(Number(max) + 1); while (n.length < max.length) n = '0' + n; return n;
+}
 function empEditor(id) {
   var isNew = !id, e = isNew ? ['', '', '', '', '', '', ''] : EMP[id].slice(), p = profileOf(id), orgs = S.data.orgs || { companies: [], brands: [] };
   var jobs = S.data.jobs.filter(function (j) { return canEdit('emp', j.dept); });
   var byDept = {}; jobs.forEach(function (j) { (byDept[j.dept] = byDept[j.dept] || []).push(j); });
   var jobOpts = Object.keys(byDept).sort(function (a, b) { return a - b; }).map(function (no) { return '<optgroup label="' + esc(deptName(+no)) + '">' + byDept[no].map(function (j) { return '<option value="' + esc(j.code) + '"' + (j.code === e[2] ? ' selected' : '') + '>' + esc(j.ar) + ' · ' + esc(j.code) + '</option>'; }).join('') + '</optgroup>'; }).join('');
+  var curDept = isNew ? '' : String(empDept(e)), deptNos = Object.keys(byDept).map(Number);
+  S.data.depts.forEach(function (d) { if (canEdit('emp', d.no) && deptNos.indexOf(d.no) < 0) deptNos.push(d.no); });
+  var deptOpts = '<option value="">— اختر القسم —</option>' + deptNos.sort(function (a, b) { return a - b; }).map(function (no) { return '<option value="' + no + '"' + (String(no) === curDept ? ' selected' : '') + '>' + esc(deptName(no)) + '</option>'; }).join('');
+  var sites = {}; S.data.emps.forEach(function (x) { var k = (x[3] || '') + '|' + (x[4] || ''); if (x[3] || x[4]) sites[k] = (sites[k] || 0) + 1; });
+  var siteOpts = '<option value="">— اختر —</option>' + Object.keys(sites).sort(function (a, b) { return sites[b] - sites[a]; }).map(function (k) { var pr = k.split('|'); return '<option value="' + esc(k) + '"' + (pr[0] === e[3] && pr[1] === e[4] ? ' selected' : '') + '>' + esc(pr[1] || pr[0]) + (pr[1] && pr[0] ? ' · ' + esc(pr[0]) : '') + '</option>'; }).join('');
   var m = modal('<div class="mbox"><div class="card"><div class="hd"><h2>' + (isNew ? 'إضافة موظف جديد' : 'تعديل بيانات الموظف') + '</h2></div><div class="bd stack">' +
-    '<div class="grid"><label class="f">الرقم الوظيفي <span class="en">Employee ID</span><input class="inp num" id="e_id" dir="ltr" value="' + esc(e[0]) + '"' + (isNew ? '' : ' readonly') + '></label><label class="f">الاسم الكامل <span class="en">Full name</span><input class="inp" id="e_nm" value="' + esc(e[1]) + '"></label></div>' +
-    '<label class="f">المنصب / الوظيفة <span class="en">Position — تغييره يُسجَّل كتنقّل في بطاقة الموظف</span><select class="inp" id="e_job"><option value="">— اختر —</option>' + jobOpts + '</select></label>' +
+    '<div class="grid"><label class="f">الرقم الوظيفي <span class="en">Employee ID' + (isNew ? ' — يُعطى تلقائياً' : '') + '</span><input class="inp num" id="e_id" dir="ltr" value="' + esc(isNew ? nextEmpIdLocal() : e[0]) + '"' + (isNew ? ' title="يعطيه النظام عند الحفظ — يمكنك تغييره"' : ' readonly') + '></label><label class="f">الاسم الكامل <span class="en">Full name</span><input class="inp" id="e_nm" value="' + esc(e[1]) + '"></label></div>' +
+    '<div class="grid"><label class="f">القسم <span class="en">Department</span><select class="inp" id="e_dept">' + deptOpts + '</select></label>' +
+    '<label class="f">المنصب / الوظيفة <span class="en">Position — تغييره يُسجَّل كتنقّل في بطاقة الموظف</span><select class="inp" id="e_job"><option value="">— اختر —</option>' + jobOpts + '</select></label></div>' +
+    '<div class="muted" id="e_jd" style="font-size:12.5px;margin-top:-6px"></div>' +
+    '<div class="grid"><label class="f">موقع العمل <span class="en">Work site</span><select class="inp" id="e_site">' + siteOpts + '</select></label>' +
+    '<label class="f">المدير المباشر <span class="en">Direct manager — حسب القسم وموقع العمل</span><select class="inp" id="e_mgr"></select></label></div>' +
     '<div class="grid"><label class="f">الشركة <span class="en">Company</span><select class="inp" id="e_co"><option value="">—</option>' + orgs.companies.map(function (c) { return '<option value="' + esc(c.id) + '"' + (c.id === p.company ? ' selected' : '') + '>' + esc(c.ar || c.en) + '</option>'; }).join('') + '</select></label>' +
     '<label class="f">البراند <span class="en">Brand</span><select class="inp" id="e_br"></select></label></div>' +
-    '<div class="grid"><label class="f">موقع العمل<input class="inp" id="e_bra" value="' + esc(e[4]) + '"></label><label class="f">Work site<input class="inp" id="e_bre" dir="ltr" value="' + esc(e[3]) + '"></label>' +
-    '<label class="f">المرجع المباشر<input class="inp" id="e_rpa" value="' + esc(e[6]) + '"></label><label class="f">Reports to<input class="inp" id="e_rpe" dir="ltr" value="' + esc(e[5]) + '"></label></div>' +
+    '<details' + (isNew ? '' : ' open') + '><summary class="muted" style="cursor:pointer;font-size:12.5px">كتابة الموقع والمرجع يدوياً</summary><div class="grid" style="margin-top:8px"><label class="f">موقع العمل<input class="inp" id="e_bra" value="' + esc(e[4]) + '"></label><label class="f">Work site<input class="inp" id="e_bre" dir="ltr" value="' + esc(e[3]) + '"></label>' +
+    '<label class="f">المرجع المباشر<input class="inp" id="e_rpa" value="' + esc(e[6]) + '"></label><label class="f">Reports to<input class="inp" id="e_rpe" dir="ltr" value="' + esc(e[5]) + '"></label></div></details>' +
     '<div class="grid">' + PF.map(function (f) { return '<label class="f">' + f[1] + ' <span class="en">' + f[2] + '</span><input class="inp" data-p="' + f[0] + '" type="' + f[3] + '"' + (f[3] !== 'text' ? ' dir="ltr"' : '') + ' value="' + esc(p[f[0]] || '') + '"></label>'; }).join('') + '</div>' +
     '<label class="f">ملاحظات <span class="en">Notes</span><textarea class="inp" data-p="notes" rows="3">' + esc(p.notes || '') + '</textarea></label>' +
     '<div class="msg" id="e_msg"></div><div class="actions"><button class="btn pri" id="e_save">حفظ</button><button class="btn sec" data-close>إلغاء</button>' + (isNew ? '' : '<button class="btn danger" id="e_del">' + ic('trash') + 'حذف الموظف</button>') + '</div></div></div></div>');
   var brands = function () { var co = $('#e_co').value; $('#e_br').innerHTML = '<option value="">—</option>' + orgs.brands.filter(function (b) { return !co || !b.company || b.company === co; }).map(function (b) { return '<option value="' + esc(b.id) + '"' + (b.id === p.brand ? ' selected' : '') + '>' + esc(b.ar || b.en) + '</option>'; }).join(''); };
   $('#e_co').onchange = brands; brands();
+  var jobSel = $('#e_job'), allJobOpts = jobSel.innerHTML;
+  var filterJobs = function () { var d = $('#e_dept').value, cur = jobSel.value; if (!d) { jobSel.innerHTML = allJobOpts; jobSel.value = cur; return; }
+    var own = (byDept[d] || []), other = jobs.filter(function (j) { return String(j.dept) !== d; });
+    jobSel.innerHTML = '<option value="">— اختر —</option>' + (own.length ? '<optgroup label="وظائف ' + esc(deptName(+d)) + '">' + own.map(function (j) { return '<option value="' + esc(j.code) + '">' + esc(j.ar) + ' · ' + esc(j.code) + '</option>'; }).join('') + '</optgroup>' : '') +
+      '<optgroup label="وظائف من أقسام أخرى">' + other.map(function (j) { return '<option value="' + esc(j.code) + '">' + esc(j.ar) + ' · ' + esc(j.code) + '</option>'; }).join('') + '</optgroup>';
+    jobSel.value = cur; };
+  var jdNote = function () { var j = JOB[jobSel.value]; $('#e_jd').innerHTML = j ? ic('jd').replace('<svg', '<svg width="14" height="14"') + ' يُربط تلقائياً بالوصف الوظيفي <b>' + esc(j.ar) + '</b> <span class="num">' + esc(j.code) + '</span> و' + ((j.b && j.b.kpis) || []).length + ' مؤشرات أداء' : ''; };
+  var mgrCands = function () {
+    var d = +($('#e_dept').value || (JOB[jobSel.value] || {}).dept || 0), site = $('#e_site').value.split('|'), selfId = $('#e_id').value.trim();
+    var isMgr = function (x) { var o = orgOf(x), j = JOB[x[2]] || {}, t = [o.title, j.en, j.ar].join(' '); return o.lead || /manager|head|director|supervisor|team ?leader|مدير|رئيس|مشرف|قائد/i.test(t); };
+    var sameSite = function (x) { return (site[0] && x[3] === site[0]) || (site[1] && x[4] === site[1]); };
+    var l = S.data.emps.filter(function (x) { return x[0] !== selfId && orgOf(x).dept === d && isMgr(x); });
+    var l2 = S.data.emps.filter(function (x) { return x[0] !== selfId && orgOf(x).dept !== d && isMgr(x); });
+    l.sort(function (a, b) { return (sameSite(b) ? 1 : 0) - (sameSite(a) ? 1 : 0) || (a[1] < b[1] ? -1 : 1); });
+    return { here: l.filter(sameSite), dept: l.filter(function (x) { return !sameSite(x); }), other: l2, d: d };
+  };
+  var mgrLabel = function (x) { var o = orgOf(x), j = JOB[x[2]] || {}; return x[1] + ' — ' + (o.title || j.en || j.ar || '') + (x[4] || x[3] ? ' · ' + (x[4] || x[3]) : ''); };
+  var fillMgr = function (keep) {
+    var c = mgrCands(), sel = $('#e_mgr'), cur = keep === undefined ? (sel.value || p.mgrId || '') : (keep || '');
+    var opt = function (x) { return '<option value="' + esc(x[0]) + '">' + esc(mgrLabel(x)) + '</option>'; };
+    sel.innerHTML = '<option value="">' + (c.here.length + c.dept.length ? '— اختر المدير المباشر —' : '— لا يوجد مدير في هذا القسم —') + '</option>' +
+      (c.here.length ? '<optgroup label="في القسم وموقع العمل نفسه">' + c.here.map(opt).join('') + '</optgroup>' : '') +
+      (c.dept.length ? '<optgroup label="في القسم — مواقع أخرى">' + c.dept.map(opt).join('') + '</optgroup>' : '') +
+      (c.other.length ? '<optgroup label="أقسام أخرى">' + c.other.map(opt).join('') + '</optgroup>' : '');
+    if (cur && EMP[cur]) sel.value = cur; else if (c.here.length === 1) sel.value = c.here[0][0]; else if (!c.here.length && c.dept.length === 1) sel.value = c.dept[0][0];
+    applyMgr();
+  };
+  var applyMgr = function () { var x = EMP[$('#e_mgr').value]; if (!x) return; var o = orgOf(x), j = JOB[x[2]] || {};
+    $('#e_rpe').value = x[1] + ((o.title || j.en) ? ' — ' + (o.title || j.en) : ''); $('#e_rpa').value = x[1] + (j.ar ? ' — ' + j.ar : ''); };
+  $('#e_mgr').onchange = applyMgr;
+  $('#e_site').onchange = function () { var pr = this.value.split('|'); if (this.value) { $('#e_bre').value = pr[0] || ''; $('#e_bra').value = pr[1] || ''; } fillMgr(''); };
+  $('#e_dept').onchange = function () { filterJobs(); jdNote(); fillMgr(''); };
+  jobSel.onchange = function () { if (!$('#e_dept').value && JOB[jobSel.value]) { $('#e_dept').value = String(JOB[jobSel.value].dept); filterJobs(); } jdNote(); fillMgr(); };
+  if ($('#e_dept').value) filterJobs(); jobSel.value = e[2] || ''; jdNote(); fillMgr(p.mgrId);
   $('#e_save').onclick = function () {
     var prof = { company: $('#e_co').value, brand: $('#e_br').value }; $$('[data-p]', m).forEach(function (i) { prof[i.dataset.p] = i.value.trim(); });
-    var emp = { id: $('#e_id').value.trim(), name: $('#e_nm').value.trim(), code: $('#e_job').value, br_en: $('#e_bre').value.trim(), br_ar: $('#e_bra').value.trim(), rep: $('#e_rpe').value.trim(), rep_ar: $('#e_rpa').value.trim(), profile: prof };
+    var emp = { id: $('#e_id').value.trim(), name: $('#e_nm').value.trim(), code: $('#e_job').value, br_en: $('#e_bre').value.trim(), br_ar: $('#e_bra').value.trim(), rep: $('#e_rpe').value.trim(), rep_ar: $('#e_rpa').value.trim(), dept: $('#e_dept').value || '', mgrId: $('#e_mgr').value || '', profile: prof };
     var btn = this; btn.disabled = true;
-    api('saveEmp', { emp: emp, isNew: isNew }).then(function (r) { return reloadData().then(function () { closeModal(); toast(isNew ? 'أُضيف الموظف' : r.renamed ? 'تغيّر الاسم في كل مكان: ' + (r.renamed.evals || 0) + ' تقييم، ' + (r.renamed.records || 0) + ' سجل رسمي، ' + (r.renamed.signed || 0) + ' استمارة موقّعة، ' + (r.renamed.reports || 0) + ' موظف يرجع إليه' : 'تم حفظ بيانات الموظف'); var h = '#/emp/' + encodeURIComponent(r.emp[0]); if (location.hash === h) route(); else location.hash = h; }); })
+    api('saveEmp', { emp: emp, isNew: isNew }).then(function (r) { return reloadData().then(function () { closeModal(); toast(isNew ? 'أُضيف الموظف برقم ' + r.emp[0] + ' وارتبط بالوصف الوظيفي ' + ((JOB[r.emp[2]] || {}).ar || r.emp[2]) : r.renamed ? 'تغيّر الاسم في كل مكان: ' + (r.renamed.evals || 0) + ' تقييم، ' + (r.renamed.records || 0) + ' سجل رسمي، ' + (r.renamed.signed || 0) + ' استمارة موقّعة، ' + (r.renamed.reports || 0) + ' موظف يرجع إليه' : 'تم حفظ بيانات الموظف'); var h = '#/emp/' + encodeURIComponent(r.emp[0]); if (location.hash === h) route(); else location.hash = h; }); })
       .catch(function (er) { btn.disabled = false; errBox('#e_msg', er); });
   };
   var del = $('#e_del'); if (del) del.onclick = function () { twoClick(del, 'تأكيد حذف الموظف؟', function () { api('deleteEmp', { id: id }).then(reloadData).then(function () { closeModal(); toast('حُذف الموظف'); location.hash = '#/emp'; }).catch(function (er) { errBox('#e_msg', er); }); }); };
