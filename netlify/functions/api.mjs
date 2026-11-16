@@ -78,6 +78,16 @@ function runMigrations(B, ed) {
         for (const [k, v] of Object.entries(ed.profiles)) if (v && v.mgrId === o.from) ed.profiles[k] = { ...v, mgrId: o.to };
       }
       else if (o.op === 'deptSet') { const d = cur().depts.find((x) => x.no === o.no); if (d) { const f = {}; for (const k of ['head', 'head_ar', 'rep', 'rep_ar']) if (o[k] !== undefined) f[k] = String(o[k]); ed.depts = { ...(ed.depts || {}), [String(o.no)]: { ...d, ...f } }; } }
+      else if (o.op === 'empOrg') {
+        /* reporting line and title for one employee; the manager is an employee (mgrId) or a name only (mgr) */
+        const all = cur().emps, e = all.find((x) => x[0] === o.id); if (!e) continue; const me = o.mgrId ? all.find((x) => x[0] === o.mgrId) : null;
+        const pf = { ...((ed.profiles || {})[e[0]] || {}) }, was = pf.mgr || e[5] || '';
+        if (o.title !== undefined) pf.title = String(o.title); if (o.unit !== undefined) pf.unit = String(o.unit);
+        if (me) { pf.mgrId = me[0]; pf.mgr = me[1]; delete pf.mgr_ar; } else if (o.mgr) { delete pf.mgrId; pf.mgr = String(o.mgr); if (o.mgr_ar) pf.mgr_ar = String(o.mgr_ar); else delete pf.mgr_ar; }
+        pf.org = 'manual'; pf.history = [...(pf.history || []), { d: now(), t: 'org', fd: empDeptOf(cur(), e, pf), td: empDeptOf(cur(), e, pf), unit: pf.unit || '', from: was, to: pf.mgr || '', by: m.by }].slice(-50);
+        ed.profiles = { ...(ed.profiles || {}), [e[0]]: pf };
+        if (pf.mgr) putEmp([e[0], e[1], e[2], e[3], e[4], pf.mgr, pf.mgr_ar || pf.mgr]);
+      }
       else if (o.op === 'deptHead') { const d = cur().depts.find((x) => x.no === o.no); if (d) ed.depts = { ...(ed.depts || {}), [String(o.no)]: { ...d, head: o.head, head_ar: o.head_ar } }; }
     }
     ed.applied.push(m.id);

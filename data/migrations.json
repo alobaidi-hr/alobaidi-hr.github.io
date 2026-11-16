@@ -615,5 +615,20 @@
     "to": "LAC-BG-122"
    }
   ]
+ },
+ {
+  "id": "2026-11-16-finance-lines",
+  "by": "Aws Firas Al-Shalal",
+  "note": "Finance & Accounting, Baghdad: owners' accounts manager, cashiers and accountants reporting lines (encrypted)",
+  "ops": [
+   {
+    "op": "enc",
+    "enc": {
+     "iv": "R9k99/IQ7551vU/j",
+     "tag": "ja4Bwx8ZKZDoBCfBtTgK7w==",
+     "data": "6yChO3cLe1hW3baZEYWPuKhwiCSR5NVxwK9CxaFzYRlP+1GhASEQweKi8iSsL49DROHlPBEkqAIK6Moakkfuq4i+af0OTFFn+ufNhiTHr2rabrjWq+xAI61QGH/5XpGIIuc65wyqjLOdCbbnbq1A5LCxZ1ejxDyQdECLqmQrQp0NVUVkxrviF9SrZLqmL30/TQMgf8FYn7tlmmWVrwTVZRsYwfwo53cMLV+icUHG1UkXRnqZ9zjCvjsIKCePH7yU9of13UWkSTRgr46e2qRVlXWf34HEX+P+b2RFjFSvV9mSnWYpYyVaFe1Hx8TWd5Y8v6qzcdxq/U0APOnnxV1Hc3CnlV4uwQcCH8fNrWyhnKoG3TfVmIcMwtw0BDvRBJp03T8jrGsZYsKjt3aIEw8kVgI5T9wu4dVxpMqGqM5oxCM37q+T0/dQRx+8d1SVuaEH/lY4CQBN4x2a4JxDWHW/Zh7QvBndBjMTiEeUBPX7pJIfys38NrpluyC3vUtOXvWEIX/5v8XXTU2Se0WvPTL1Drm9MoEs/3AtaooKHuDfroT4cjtufDCf1aRmHOgr8mtaEAGQtBy7JKqqaOYLZJndGuNaaOfXktWjckm3dHJGp7yzW6zT/h2GiXsFxdcWKORYmv6okki6rDFB6fYO6i8VpPiv6wN8Ey/sXTsJWxlQQmkcidax1XQgq2yxbGqNgyTUVDOeUme75UKx4G9qKI+R4nA8DKRLlY0J6zzB9cCfGIe4Mi3PItAqFZApRBQlOQP+iH3BdJakUM+kskmN4JDkvJGF/TcV9MK7PEaElEcmz1hyqGCJA165d0bUf6RlXJt6BF6+qHvQMSkFx60QQIyAThJsd7DkneDNXhs8uQoDnxATHV5FrD5+0jbWSjpVMoC9MyD/uHwG4TbUvwgT1G/c0nywYK0KziWJeON0DrQwlymUow8qynBT0y2ZlGNaLkCq9m65v4OE/26FQk4BKC/c+YKBBaymUpd8ETqX6CEGGuoOAon2ZX1IV84G+36tE5BeC3SuC78L8lpmTzf1yDREMRUGv2gkGHbXDqOfs5rtnX/8NQZ22dzaoFgHn6XAxaK2k7Met+KCVNoIMY+X2jyHwUSC/TlhBYTLfj532YkUK2/u24BCf9DWDqYtJ4JW9pbRo1b1SwwnGA=="
+    }
+   }
+  ]
  }
 ]
