@@ -580,7 +580,7 @@ VIEWS.eval = function (v, editId, q) {
   var drawEmp = function () {
     if (!F.emp) { $('#empcard').innerHTML = ''; $('#kpis').innerHTML = '<div class="empty" style="margin:12px 16px">اختر موظفاً لتظهر مؤشرات وظيفته تلقائياً</div>'; return; }
     var e = EMP[F.emp], j = JOB[e[2]] || { ar: e[2], en: '', b: { kpis: [] } }; if (SNAP) j = { ar: j.ar, en: j.en, b: { kpis: SNAP.k } };
-    $('#empcard').innerHTML = '<div class="card" style="box-shadow:none;background:var(--surface2)"><div class="bd ov">' + kv('الاسم', '<b>' + esc(e[1]) + '</b>') + kv('الرقم', '<b class="num">' + esc(e[0]) + '</b>') + kv('المسمى', esc(j.ar) + '<div class="en">' + esc(j.en) + ' · ' + esc(e[2]) + '</div>') + kv('الموقع', esc(e[4] || e[3])) + kv('المرجع المباشر', esc(empMgr(e))) + '</div></div>' +
+    $('#empcard').innerHTML = '<div class="card" style="box-shadow:none;background:var(--surface2)"><div class="bd ov">' + kv('الاسم', '<b>' + esc(e[1]) + '</b>') + kv('الرقم', '<b class="num">' + esc(e[0]) + '</b>') + kv('المسمى', esc(j.ar) + '<div class="en">' + esc(j.en) + ' · ' + esc(e[2]) + '</div>') + kv('المحافظة', esc(govOf(e))) + kv('المرجع المباشر', esc(empMgr(e))) + '</div></div>' +
       (F.editId && !MODE ? '<div class="note warn">هذا الموظف مُقيَّم سابقاً لنفس الفترة — الإرسال سيحدّث التقييم السابق.</div>' : '');
     var sf = F.self = findSelf(F.emp, $('#type').value, $('#period').value), sv = function (arr, i) { return sf && arr && arr.length > i ? '<span class="selfchip" title="تقييم الموظف لنفسه">ذاتي: ' + (arr[i] == null ? 'N/A' : arr[i]) + '</span>' : ''; };
     $('#kpis').innerHTML = j.b.kpis.map(function (k, i) { return '<div class="srow" id="ra' + i + '"><div style="min-width:0"><div class="t">' + esc(k.ar || k.en) + '<span class="wt">' + k.w + '%</span>' + sv(sf && sf.k.length === j.b.kpis.length ? sf.a : null, i) + '</div><div class="d en">' + esc(k.en) + '</div><span class="tg">الهدف: ' + esc(k.t_ar || k.t_en) + '</span></div>' + scale('a', i, F.a[i], true) + '</div>'; }).join('');
@@ -1833,6 +1833,16 @@ function sigChain(r) {
 }
 /* an employee's form shows his own manager and site; the job description lists every site's manager */
 function empMgr(emp, ep) { ep = ep || profileOf(emp[0]); return ep.mgr_ar || ep.mgr || emp[6] || emp[5] || ''; }
+/* the governorate of a work site: Baghdad, Erbil, Mosul, Basra — from the site name, else from the employee number (LAC-BG-…) */
+var GOV = [[/baghdad|بغداد/i, 'بغداد', 'BG'], [/erbil|arbil|hawler|اربيل|أربيل/i, 'أربيل', 'ER'], [/mosul|موصل/i, 'الموصل', 'MO'], [/basra|بصرة|البصره/i, 'البصرة', 'BS']];
+function govOf(e) { var t = (e[3] || '') + ' ' + (e[4] || ''), m = /^LAC-([A-Z]{2})-/.exec(e[0] || ''); for (var i = 0; i < GOV.length; i++) if (GOV[i][0].test(t)) return GOV[i][1]; if (m) for (var k = 0; k < GOV.length; k++) if (GOV[k][2] === m[1]) return GOV[k][1]; return /^LAC-HQ-/.test(e[0] || '') || /iraq|العراق/i.test(t) ? 'العراق — الإدارة العامة' : (e[4] || e[3] || ''); }
+/* a job description that names one manager per governorate: keep the one of the employee's governorate */
+function mgrForGov(list, g) {
+  var names = String(list || '').split(/\s*[·•،,\/|]\s*/).filter(Boolean); if (names.length < 2) return list || '';
+  var norm = function (x) { return String(x).toLowerCase().replace(/\s+/g, ' ').trim(); };
+  var keep = names.filter(function (n) { var e = S.data.emps.filter(function (x) { return norm(x[1]) === norm(n) || norm(n).indexOf(norm(x[1])) === 0; })[0]; return e && govOf(e) === g; });
+  return keep.length ? keep.join(' · ') : list;
+}
 function empRow(ar, en, v, fb) { v = v || fb || ''; return v ? '<tr><td class="k">' + ar + ' <span class="en">' + en + '</span></td><td>' + esc(v) + '</td></tr>' : ''; }
 function jdPaper(j, emp) {
   var b = j.b, d = DEPT[emp ? empDept(emp) : j.dept] || {}, ov = b.ov || {}, ep = emp ? profileOf(emp[0]) : null;
@@ -1840,7 +1850,7 @@ function jdPaper(j, emp) {
   return '<div class="paper">' + letterhead(emp ? 'الوصف الوظيفي ومؤشرات الأداء' : 'الوصف الوظيفي', emp ? 'JOB DESCRIPTION &amp; KPIs' : 'JOB DESCRIPTION', esc(j.code) + (emp ? ' · ' + esc(emp[0]) : '') + ' · v1.0') +
     '<table>' + (emp ? '<tr><td class="k">الموظف <span class="en">Employee</span></td><td><b>' + esc(emp[1]) + '</b> <span class="num">· ' + esc(emp[0]) + '</span></td></tr>' +
       (ep.unit || ep.title ? '<tr><td class="k">الوحدة والمنصب في الهيكل <span class="en">Unit &amp; org title</span></td><td>' + esc([deptName(empDept(emp)), ep.unit, ep.title].filter(Boolean).join(' — ')) + '</td></tr>' : '') +
-      '' : '') + '<tr><td class="k">المسمى <span class="en">Title</span></td><td><b>' + esc(j.ar) + '</b> <span class="en">· ' + esc(j.en) + '</span></td></tr><tr><td class="k">القسم <span class="en">Department</span></td><td>' + esc(d.ar) + ' <span class="en">· ' + esc(d.en) + '</span></td></tr>' + o('Grade', 'الدرجة') + (emp ? empRow('المرجع المباشر', 'Reports To', empMgr(emp, ep), (ov['Reports To'] || [])[0]) + empRow('موقع العمل', 'Site', emp[4] || emp[3] || '', '') : o('Reports To', 'المرجع') + o('Branches', 'مواقع العمل')) + o('Employment Type', 'نوع التوظيف') + '</table>' +
+      '' : '') + '<tr><td class="k">المسمى <span class="en">Title</span></td><td><b>' + esc(j.ar) + '</b> <span class="en">· ' + esc(j.en) + '</span></td></tr><tr><td class="k">القسم <span class="en">Department</span></td><td>' + esc(d.ar) + ' <span class="en">· ' + esc(d.en) + '</span></td></tr>' + o('Grade', 'الدرجة') + (emp ? empRow('المرجع المباشر', 'Reports To', empMgr(emp, ep), mgrForGov((ov['Reports To'] || [])[0], govOf(emp))) + empRow('المحافظة', 'Governorate', govOf(emp), '') : o('Reports To', 'المرجع') + o('Branches', 'مواقع العمل')) + o('Employment Type', 'نوع التوظيف') + '</table>' +
     '<div class="band"><span>الغرض من الوظيفة</span><span class="en">JOB PURPOSE</span></div><p style="margin:4px 0">' + esc(b.purpose[1]) + '</p><p class="en" style="margin:0">' + esc(b.purpose[0]) + '</p>' +
     '<div class="band"><span>المهام والمسؤوليات</span><span class="en">DUTIES</span></div><ol>' + b.duties.map(function (x) { return '<li>' + esc(x[1]) + ' <span class="en">— ' + esc(x[0]) + '</span></li>'; }).join('') + '</ol>' +
     '<div class="band"><span>مؤشرات الأداء الرئيسية</span><span class="en">KPIs</span></div><table><tr><th>#</th><th>المؤشر</th><th>الهدف</th><th>القياس</th><th>الدورية</th><th class="c">الوزن</th></tr>' + b.kpis.map(function (k, i) { return '<tr><td class="c num">' + (i + 1) + '</td><td>' + esc(k.ar || k.en) + '<br><span class="en">' + esc(k.en) + '</span></td><td>' + esc(k.t_ar || k.t_en) + '</td><td>' + esc(k.m_ar || k.m_en) + '</td><td>' + esc(k.f_ar || k.f_en) + '</td><td class="c num">' + k.w + '%</td></tr>'; }).join('') + '</table>' +
