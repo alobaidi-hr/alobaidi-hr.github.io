@@ -1847,7 +1847,7 @@ function empRow(ar, en, v, fb) { v = v || fb || ''; return v ? '<tr><td class="k
 function jdPaper(j, emp) {
   var b = j.b, d = DEPT[emp ? empDept(emp) : j.dept] || {}, ov = b.ov || {}, ep = emp ? profileOf(emp[0]) : null;
   var o = function (k, ar) { var x = ov[k]; return x && x.length ? '<tr><td class="k">' + ar + ' <span class="en">' + k + '</span></td><td>' + esc(x[0]) + (x[1] ? ' <span class="en">/ ' + esc(x[1]) + '</span>' : '') + '</td></tr>' : ''; };
-  return '<div class="paper">' + letterhead(emp ? 'الوصف الوظيفي ومؤشرات الأداء' : 'الوصف الوظيفي', emp ? 'JOB DESCRIPTION &amp; KPIs' : 'JOB DESCRIPTION', esc(j.code) + (emp ? ' · ' + esc(emp[0]) : '') + ' · v1.0') +
+  return '<div class="paper fit1">' + letterhead(emp ? 'الوصف الوظيفي ومؤشرات الأداء' : 'الوصف الوظيفي', emp ? 'JOB DESCRIPTION &amp; KPIs' : 'JOB DESCRIPTION', esc(j.code) + (emp ? ' · ' + esc(emp[0]) : '') + ' · v1.0') +
     '<table>' + (emp ? '<tr><td class="k">الموظف <span class="en">Employee</span></td><td><b>' + esc(emp[1]) + '</b> <span class="num">· ' + esc(emp[0]) + '</span></td></tr>' +
       (ep.unit || ep.title ? '<tr><td class="k">الوحدة والمنصب في الهيكل <span class="en">Unit &amp; org title</span></td><td>' + esc([deptName(empDept(emp)), ep.unit, ep.title].filter(Boolean).join(' — ')) + '</td></tr>' : '') +
       '' : '') + '<tr><td class="k">المسمى <span class="en">Title</span></td><td><b>' + esc(j.ar) + '</b> <span class="en">· ' + esc(j.en) + '</span></td></tr><tr><td class="k">القسم <span class="en">Department</span></td><td>' + esc(d.ar) + ' <span class="en">· ' + esc(d.en) + '</span></td></tr>' + o('Grade', 'الدرجة') + (emp ? empRow('المرجع المباشر', 'Reports To', empMgr(emp, ep), mgrForGov((ov['Reports To'] || [])[0], govOf(emp))) + empRow('المحافظة', 'Governorate', govOf(emp), '') : o('Reports To', 'المرجع') + o('Branches', 'مواقع العمل')) + o('Employment Type', 'نوع التوظيف') + '</table>' +
@@ -1859,10 +1859,21 @@ function jdPaper(j, emp) {
     (function () { /* the job description is signed by the job holder only */ var l = [['شاغل الوظيفة (اطّلعت ووافقت)', 'Job holder — read and agreed', emp ? emp[1] : '', emp ? emp[0] : '']];
       return sigBoxes(l).replace('التواقيع وسلسلة الاعتماد', 'توقيع الموظف').replace('SIGNATURES &amp; APPROVAL CHAIN', 'EMPLOYEE SIGNATURE'); })() + (emp ? '<div class="formcode"><span style="font-size:10.5px">بعد التوقيع يُرفع هذا الوصف في «مكتبة الاستمارات الموقّعة» ويُحفظ تلقائياً في ملف الموظف بهذا الرمز.<br><span class="en">Upload the signed copy to the Signed Forms Library — it is filed by this code.</span></span><span class="code">JD · ' + esc(emp[0]) + '</span></div>' : '') + paperFoot() + '</div>';
 }
+/* a job description prints on one A4 page: when it is longer, it is scaled down to fit (printable area of A4 with 8mm margins ≈ 733×1062 px) */
+function fitPapers(pa) {
+  /* measured the way the page prints: no padding, the printable width; a scaled page gets a wider layout box so lines wrap as printed */
+  var keep = pa.getAttribute('style') || ''; pa.setAttribute('style', 'display:block;position:absolute;left:-20000px;top:0;width:733px');
+  $$('.paper.fit1', pa).forEach(function (p) {
+    var z = 1; p.style.padding = '0'; p.style.margin = '0';
+    for (var i = 0; i < 5; i++) { p.style.zoom = ''; p.style.width = (733 / z) + 'px'; var h = p.scrollHeight, nz = Math.min(1, 1035 / h); if (Math.abs(nz - z) < 0.004) { z = nz; break; } z = nz; }
+    p.style.width = (733 / z).toFixed(1) + 'px'; p.style.zoom = z.toFixed(3); p.dataset.fit = z.toFixed(3);
+  });
+  pa.setAttribute('style', keep);
+}
 function printPapers(htmls) {
   if (window.LO_PRINT) return window.LO_PRINT(htmls);
-  var pa = $('#printArea'); pa.innerHTML = htmls.join('');
-  var imgs = $$('img', pa), go = function () { document.body.classList.add('printing'); window.print(); };
+  var pa = $('#printArea'); pa.innerHTML = htmls.join(''); fitPapers(pa);
+  var imgs = $$('img', pa), go = function () { fitPapers(pa); document.body.classList.add('printing'); window.print(); };
   var pending = imgs.filter(function (i) { return !i.complete; }).length;
   if (!pending) go(); else imgs.forEach(function (i) { if (!i.complete) i.onload = i.onerror = function () { if (--pending === 0) go(); }; });
 }
