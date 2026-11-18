@@ -94,12 +94,6 @@ function runMigrations(B, ed) {
   }
   return ed;
 }
-/* the link key the owner issued for the ERP (only its hash is kept) */
-async function erpKeyOk(key) {
-  const s = await getJSON('settings', {}); if (!s.erpKeyHash || !key) err('auth', 'مفتاح الربط غير صالح');
-  const h = crypto.createHash('sha256').update(String(key)).digest(); if (!crypto.timingSafeEqual(h, Buffer.from(s.erpKeyHash, 'hex'))) err('auth', 'مفتاح الربط غير صالح');
-  return s;
-}
 /* org-chart placements are personal data: they travel encrypted, the key lives only in the function's environment */
 function decryptOrg(enc) {
   const key = Buffer.from(process.env.ORG_DATA_KEY || '', 'base64'); if (key.length !== 32) throw new Error('ORG_DATA_KEY');
@@ -1168,36 +1162,9 @@ const R = {
     s.erpKeyHash = crypto.createHash('sha256').update(key).digest('hex'); s.erpKeyAt = now(); s.erpKeyBy = u.name; await setJSON('settings', s);
     await logVisit(email, u.name, 'erp-key', 'issued'); return { key, active: true, issued: s.erpKeyAt };
   },
-  /* the ERP is the master of employee names: after its sync it renames each linked person to his ERP name.
-     Only names of people already here change; every place that names him (manager, department head) follows, and
-     forms still in progress show the new name; approved evaluations keep the name they were signed with. */
-  async erpNames({ key, names }) {
-    await erpKeyOk(key); await loadData();
-    if (!Array.isArray(names) || names.length > 2000) err('invalid', 'قائمة الأسماء غير صالحة');
-    const ed = await getJSON('edits', {}), cur = () => applyEdits(BASE, ed); let renamed = 0, unknown = 0;
-    for (const it of names) {
-      const id = String((it && it.id) || ''), name = String((it && it.name) || '').replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 120);
-      const e = cur().emps.find((x) => x[0] === id); if (!e) { unknown++; continue; }
-      const old = e[1]; if (name.length < 2 || name === old) continue;
-      ed.emps = { ...(ed.emps || {}), [id]: [e[0], name, ...e.slice(2)] };
-      const prof = { ...(ed.profiles || {}) };
-      for (const [k, v] of Object.entries(prof)) if (v && (v.mgrId === id || (!v.mgrId && v.mgr === old))) prof[k] = { ...v, mgr: name };
-      prof[id] = { ...(prof[id] || {}), history: [...((prof[id] || {}).history || []), { d: now(), t: 'rename', from: old, to: name, by: 'ERP' }].slice(-50) };
-      ed.profiles = prof;
-      for (const x of cur().emps) if (x[0] !== id && (x[5] === old || x[6] === old)) ed.emps[x[0]] = [x[0], x[1], x[2], x[3], x[4], x[5] === old ? name : x[5], x[6] === old ? name : x[6]];
-      for (const d of cur().depts) { const f = {}; for (const k of ['head', 'rep']) if (d[k] === old) f[k] = name; if (Object.keys(f).length) ed.depts = { ...(ed.depts || {}), [String(d.no)]: { ...d, ...f } }; }
-      renamed++;
-    }
-    if (renamed) {
-      await setJSON('edits', ed);
-      const all = await evals(), ren = new Map(names.map((x) => [String(x.id), x.name])); let touched = false;
-      for (const r of Object.values(all)) if (r.wf && r.wf.stage !== 'done' && r.emp && ren.has(r.emp.id) && cur().emps.some((x) => x[0] === r.emp.id)) { const n = cur().emps.find((x) => x[0] === r.emp.id)[1]; if (r.emp.name !== n) { r.emp.name = n; touched = true; } }
-      if (touched) await setJSON('evals', all);
-    }
-    await logVisit('erp', 'ERP', 'erp-names', renamed + ' renamed'); return { renamed, unknown };
-  },
   async erpFeed({ key }) {
-    const s = await erpKeyOk(key);
+    const s = await getJSON('settings', {}); if (!s.erpKeyHash || !key) err('auth', 'مفتاح الربط غير صالح');
+    const h = crypto.createHash('sha256').update(String(key)).digest(); if (!crypto.timingSafeEqual(h, Buffer.from(s.erpKeyHash, 'hex'))) err('auth', 'مفتاح الربط غير صالح');
     await loadData();
     const evs = Object.values(await evals()).filter((r) => r.wf && r.wf.stage === 'done');
     s.erpLastPull = now(); await setJSON('settings', s); await logVisit('erp', 'ERP', 'erp-pull', evs.length + ' evals');
