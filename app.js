@@ -2452,7 +2452,7 @@ VIEWS.signed = function (v) {
       '', '<button class="btn sec" id="sgr">' + ic('refresh') + 'تحديث</button>') +
     '<div class="drop" id="sdz"><div style="font-size:15px;font-weight:700">' + ic('up').replace('<svg', '<svg width="22" height="22"') + ' اسحب الملفات هنا أو اضغط للاختيار</div><div class="muted" style="font-size:12.5px;margin-top:6px">PDF أو صور (ماسح ضوئي أو كاميرا الهاتف) · ملفات كثيرة دفعة واحدة · يُفضَّل أن يتضمن اسم الملف الرقم الوظيفي، وإلا يقرأ النظام الرقم أو رمز الاستمارة من الصفحة' + (ADM ? '' : ' · موظفو أقسامك فقط') + '</div><input type="file" id="sfi" multiple accept="application/pdf,image/*" hidden></div>' +
     '<div id="sq" style="margin-top:12px"></div><div id="sgrev" style="margin-top:14px"></div>' +
-    '<div class="card" style="margin-top:14px"><div class="hd"><h2>' + (ADM ? 'المكتبة' : 'ما رفعته وملفات موظفي أقسامك') + '</h2><div class="actions"><div class="seg" id="sgt"></div><input class="inp" id="sgq" type="search" placeholder="بحث بالاسم أو الرقم" style="max-width:240px"></div></div><div class="bd" id="sgl"><div class="loading" style="min-height:14vh"><div class="spin"></div></div></div></div>';
+    '<div class="card" style="margin-top:14px"><div class="hd"><h2>' + (ADM ? 'المكتبة' : 'ما رفعته وملفات موظفي أقسامك') + '</h2><div class="actions"><div class="seg" id="sgt"></div><select class="inp" id="sgzd" style="width:auto" title="القسم"><option value="">كل الأقسام</option></select><button class="btn sec" id="sgz">' + ic('dl') + 'تنزيل ZIP</button><input class="inp" id="sgq" type="search" placeholder="بحث بالاسم أو الرقم" style="max-width:240px"></div></div><div class="bd" id="sgl"><div class="loading" style="min-height:14vh"><div class="spin"></div></div></div></div>';
   var empOpts = function (sel) { return '<option value="">— اختر الموظف —</option>' + S.data.emps.slice().sort(function (a, b) { return a[1] < b[1] ? -1 : 1; }).map(function (e) { return '<option value="' + esc(e[0]) + '"' + (e[0] === sel ? ' selected' : '') + '>' + esc(e[1]) + ' · ' + esc(e[0]) + '</option>'; }).join(''); };
   var drawQ = function () {
     $('#sq').innerHTML = Q.length ? '<div class="card"><div class="hd"><h2>الرفع الحالي (' + Q.filter(function (x) { return x.st === 'done'; }).length + '/' + Q.length + ')</h2></div><div class="bd">' + Q.map(function (x, i) {
@@ -2512,10 +2512,16 @@ VIEWS.signed = function (v) {
         (ADM ? '<button class="btn sec sm" data-sa="' + esc(x.id) + '">نقل</button>' : '') + (canDel ? '<button class="btn danger sm" data-sd="' + esc(x.id) + '">حذف</button>' : '') + '</div></td></tr>';
     }).join('') + '</tbody></table></div>' : '<div class="empty">لا توجد ملفات' + (TAB === 'pending' ? ' بانتظار المراجعة' : '') + '</div>';
   };
-  var load = function () { return api('signedList').then(function (r) { list = r.items; drawRev(); drawL(); }).catch(function (e) { $('#sgl').innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; }); };
+  var drawZ = function () { var ds = {}; list.forEach(function (x) { ds[x.dept || 0] = (ds[x.dept || 0] || 0) + 1; }); var cur = $('#sgzd').value; $('#sgzd').innerHTML = '<option value="">كل الأقسام (' + list.length + ')</option>' + Object.keys(ds).sort(function (a, b) { return (deptName(+a) || '') < (deptName(+b) || '') ? -1 : 1; }).map(function (d) { return '<option value="' + d + '"' + (d === cur ? ' selected' : '') + '>' + esc(deptName(+d) || 'بلا قسم') + ' (' + ds[d] + ')</option>'; }).join(''); };
+  var load = function () { return api('signedList').then(function (r) { list = r.items; drawRev(); drawL(); drawZ(); }).catch(function (e) { $('#sgl').innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; }); };
   $('#sgq').oninput = function () { q = this.value.trim().toLowerCase(); drawL(); };
   $('#sgt').onclick = function (e) { var b = e.target.closest('[data-tab]'); if (b) { TAB = b.dataset.tab; drawL(); } };
   $('#sgr').onclick = load;
+  $('#sgz').onclick = function () {
+    /* the files of the tab shown (all / approved / …), every department or the one chosen, foldered by department */
+    var dsel = $('#sgzd').value, l = list.filter(function (x) { return (TAB === 'all' || x.st === TAB) && (!dsel || String(x.dept || 0) === dsel); });
+    downloadSigned(l, dsel ? (deptName(+dsel) || 'بلا قسم') : '');
+  };
   $('#sgrev').onclick = function (e) {
     var b = e.target.closest('[data-rv]'); if (!b) return; var k = b.dataset.rv, act = /-x$/.test(k) ? 'reject' : 'approve', base = k.replace('-x', '');
     if (base === 'all') { if (!confirm('اعتماد كل الملفات المنتظرة (' + pend().length + ')؟')) return; return review({ act: 'approve', all: true }, 'الكل'); }
@@ -2536,6 +2542,49 @@ VIEWS.signed = function (v) {
   };
   load();
 };
+/* a ZIP written in the browser (stored, no compression: PDFs and photos are already compressed); names in UTF-8 */
+var CRC_T = null;
+function crc32(b) { if (!CRC_T) { CRC_T = []; for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; CRC_T[n] = c >>> 0; } } var crc = 0xFFFFFFFF; for (var i = 0; i < b.length; i++) crc = CRC_T[(crc ^ b[i]) & 0xFF] ^ (crc >>> 8); return (crc ^ 0xFFFFFFFF) >>> 0; }
+function makeZip(files) {
+  var enc = new TextEncoder(), parts = [], central = [], off = 0, d = new Date();
+  var dt = ((d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1)) & 0xFFFF, dd = (((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate()) & 0xFFFF;
+  files.forEach(function (f) {
+    var nm = enc.encode(f.name), data = f.bytes, crc = crc32(data), h = new DataView(new ArrayBuffer(30));
+    h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); h.setUint16(8, 0, true); h.setUint16(10, dt, true); h.setUint16(12, dd, true);
+    h.setUint32(14, crc, true); h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, nm.length, true); h.setUint16(28, 0, true);
+    parts.push(h.buffer, nm, data);
+    var c = new DataView(new ArrayBuffer(46));
+    c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(8, 0x0800, true); c.setUint16(10, 0, true); c.setUint16(12, dt, true); c.setUint16(14, dd, true);
+    c.setUint32(16, crc, true); c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, nm.length, true); c.setUint32(42, off, true);
+    central.push(c.buffer, nm); off += 30 + nm.length + data.length;
+  });
+  var csize = central.reduce(function (s, x) { return s + x.byteLength; }, 0), e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, csize, true); e.setUint32(16, off, true);
+  return new Blob(parts.concat(central, [e.buffer]), { type: 'application/zip' });
+}
+function dataUrlBytes(u) { var b = atob(String(u).split(',')[1] || ''), a = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) a[i] = b.charCodeAt(i); return a; }
+/* every signed document the user can see, in one ZIP: a folder per department, a file per document named by the employee */
+function downloadSigned(list, label) {
+  if (!list.length) { toast('لا توجد ملفات للتنزيل'); return Promise.resolve(); }
+  var safe = function (s) { return String(s || '').replace(/[\\/:*?"<>|\u0000-\u001f]+/g, '-').replace(/\s+/g, ' ').trim().slice(0, 90); };
+  var ext = { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }, files = [], used = {}, fail = 0, i = 0;
+  modal('<div class="mbox narrow"><div class="card"><div class="hd"><h2>تنزيل الوثائق الموقّعة</h2></div><div class="bd stack"><div id="zpm">يجهّز ' + list.length + ' ملف…</div><div class="bar" style="height:8px;background:var(--line);border-radius:6px;overflow:hidden"><i id="zpb" style="display:block;height:100%;width:0;background:var(--accent)"></i></div></div></div></div>');
+  var next = function () {
+    if (i >= list.length) return Promise.resolve();
+    var x = list[i++];
+    return api('signedGet', { id: x.id }).then(function (r) {
+      var folder = safe(x.dept ? deptName(x.dept) : '') || 'بلا قسم', kind = x.kind === 'jd' ? 'وصف وظيفي' : x.evalId ? 'استمارة تقييم ' + (x.period || '') : 'وثيقة';
+      var base = safe([x.empId, x.empName, kind].filter(Boolean).join(' - ')) || safe(x.file) || x.id, nm = folder + '/' + base, k = nm, n = 2;
+      while (used[k]) k = nm + ' (' + n++ + ')'; used[k] = 1;
+      files.push({ name: k + '.' + (ext[r.item.mime || x.mime] || 'bin'), bytes: dataUrlBytes(r.data) });
+    }).catch(function () { fail++; }).then(function () { var m = $('#zpm'), b = $('#zpb'); if (m) m.textContent = 'تم ' + i + ' من ' + list.length; if (b) b.style.width = Math.round(i / list.length * 100) + '%'; return next(); });
+  };
+  return next().then(function () {
+    var a = document.createElement('a'), url = URL.createObjectURL(makeZip(files));
+    a.href = url; a.download = 'الوثائق الموقّعة' + (label ? ' - ' + label : '') + ' - ' + new Date().toISOString().slice(0, 10) + '.zip'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+    closeModal(); toast('نُزّل ' + files.length + ' ملف' + (fail ? ' — تعذّر ' + fail : ''));
+  });
+}
 function sgPill(x) { return x.st === 'pending' ? '<span class="pill r1">بانتظار الاعتماد</span>' : x.st === 'rejected' ? '<span class="pill r0">مرفوض</span>' : ''; }
 function openSigned(id) {
   api('signedGet', { id: id }).then(function (r) {
