@@ -1088,7 +1088,7 @@ function userForm(x) {
 }
 function inviteModal(x, code) {
   /* the portal now lives on the ERP server; an old Netlify / GitHub Pages address saved in the settings is not used */
-  var saved = S.data.settings.app_url || '', url = saved && !/netlify\.app|github\.io/i.test(saved) ? saved : 'https://erp.g-n-group.com/hr/';
+  var saved = S.data.settings.app_url || '', url = saved && !/netlify\.app|github\.io|g-n-group\.com\/hr\b/i.test(saved) ? saved : 'https://erp.g-n-group.com/jdkpi/';
   if (window.LO_API) { var t2 = 'السلام عليكم ' + (x.name || '') + '،\n\nتمت إضافتك إلى نظام الأوصاف الوظيفية وتقييم الأداء في ' + ((S.brand || {}).company_ar || 'شركة الليث العبيدي') + '.\n\nالرابط: ' + url + '\nادخل بحساب claude.ai المسجّل على بريدك: ' + x.email + '\n\nمع التحية،\nأوس فراس الشلال\nمدير الموارد البشرية';
     modal('<div class="mbox narrow"><div class="card"><div class="hd"><h2>دعوة ' + esc(x.name || x.email) + '</h2></div><div class="bd stack"><div class="note warn">الخطوة الأخيرة: من زر <b>Share</b> أعلى الصفحة أضف البريد <b class="num">' + esc(x.email) + '</b> بصلاحية <b>Editor</b> حتى يتمكن من الدخول والإرسال.</div><label class="f">نص الرسالة<textarea class="inp" id="itx" rows="9" readonly>' + esc(t2) + '</textarea></label><div class="actions"><button class="btn pri" id="icp">نسخ النص</button><button class="btn sec" data-close>إغلاق</button></div></div></div></div>');
     $('#icp').onclick = function () { var t = $('#itx'); (navigator.clipboard ? navigator.clipboard.writeText(t.value) : Promise.reject()).then(function () { toast('تم النسخ'); }, function () { t.select(); toast('حدّد النص وانسخه'); }); }; return; }
